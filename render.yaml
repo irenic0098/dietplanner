@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: dietplanner-backend
+    env: python
+    plan: free
+
+    # Build Configuration
+    buildCommand: |
+      python -m pip install --upgrade pip setuptools wheel && \
+      pip install -r backend/requirements.txt && \
+      cd backend && python manage.py migrate && \
+      cd .. && python backend/manage.py collectstatic --no-input || true
+
+    # Start Command
+    startCommand: gunicorn backend.config.wsgi:application
+
+    # Environment Variables
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "False"
+
+    # Public Routes
+    routes:
+      - path: /
+        matchType: prefix
+
+    healthCheckPath: /admin/
+
+    autoDeploy: true
