@@ -13,19 +13,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
+# Set working directory
 WORKDIR /app
 
-# Copy requirements
+# Copy requirements from backend folder
 COPY requirements.txt /app/requirements.txt
 
 # Upgrade pip and install dependencies
 RUN python -m pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r /app/requirements.txt
 
-# Copy project
+# Copy the entire repository into the image
 COPY . /app
 
-# Collect static files
+# Collect static files (run from backend directory)
 RUN python backend/manage.py collectstatic --no-input || true
 
 # Expose port
