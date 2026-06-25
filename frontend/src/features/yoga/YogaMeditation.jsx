@@ -64,15 +64,17 @@ function VideoCard({ video, onPlay, onBookmark, onComplete }) {
         }}
       >
         <img
-          src={`https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`}
+          src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`}
           alt={video.title}
           style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' }}
           onError={e => {
-            // Fallback chain: hqdefault → mqdefault → inline placeholder
-            if (e.currentTarget.src.includes('hqdefault')) {
-              e.currentTarget.src = `https://img.youtube.com/vi/${video.youtube_id}/mqdefault.jpg`;
-            } else if (e.currentTarget.src.includes('mqdefault')) {
-              e.currentTarget.style.display = 'none';
+            const img = e.currentTarget;
+            if (video.thumbnail_url && img.src === video.thumbnail_url) {
+              img.src = `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`;
+            } else if (img.src.includes('hqdefault')) {
+              img.src = `https://img.youtube.com/vi/${video.youtube_id}/mqdefault.jpg`;
+            } else {
+              img.style.display = 'none';
             }
           }}
           onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.06)'}
