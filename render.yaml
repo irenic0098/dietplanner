@@ -1,25 +1,18 @@
 services:
   - type: web
     name: dietplanner-backend
-    env: python
+    env: docker
     plan: free
 
-    # Build Configuration
-    buildCommand: |
-      python -m pip install --upgrade pip setuptools wheel && \
-      pip install -r backend/requirements.txt && \
-      cd backend && python manage.py migrate && \
-      cd .. && python backend/manage.py collectstatic --no-input || true
+    # Docker build (Render will build from Dockerfile in backend/)
+    dockerfilePath: backend/Dockerfile
 
-    # Start Command
-    startCommand: gunicorn backend.config.wsgi:application
+    # Start Command inside container
+    startCommand: gunicorn backend.config.wsgi:application --bind 0.0.0.0:8000
 
-    # Environment Variables
-    envVars:
-      - key: ENVIRONMENT
-        value: production
-      - key: DEBUG
-        value: "False"
+    # Environment Variables (set in Render dashboard as secrets)
+    # ENVIRONMENT=production
+    # DEBUG=False
 
     # Public Routes
     routes:
