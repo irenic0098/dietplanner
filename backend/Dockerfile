@@ -1,36 +1,31 @@
 FROM python:3.11-slim
 
-# Install system dependencies required for Pillow and other packages
+# Install system dependencies required for Pillow and database drivers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libjpeg-dev \
     zlib1g-dev \
     libpng-dev \
-    libblas-dev \
-    liblapack-dev \
     libpq-dev \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
-# Set working directory
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Copy requirements from backend folder
-COPY requirements.txt /app/requirements.txt
-
-# Upgrade pip and install dependencies
+# Install Python dependencies first for cache stability
+COPY backend/requirements.txt /app/requirements.txt
 RUN python -m pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r /app/requirements.txt
 
-# Copy the entire repository into the image
-COPY . /app
+# Copy application code into the image
+COPY backend/ /app
 
-# Collect static files (run from backend directory)
-RUN python backend/manage.py collectstatic --no-input || true
+# Collect static files from the Django app
+RUN python manage.py collectstatic --no-input
 
-# Expose port
 EXPOSE 8000
 
-# Start command
-CMD ["gunicorn", "backend.config.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]

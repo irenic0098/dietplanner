@@ -7,9 +7,9 @@ services:
     plan: free
 
     buildCommand: |
-      python -m pip install --upgrade pip setuptools wheel
-      pip install -r requirements.txt
-      python manage.py migrate
+      python -m pip install --upgrade pip setuptools wheel && \
+      pip install --no-cache-dir -r requirements.txt && \
+      python manage.py migrate && \
       python manage.py collectstatic --no-input
 
     startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:8000

@@ -43,7 +43,7 @@
 - ✅ `backend/requirements.txt` - Python dependencies
 - ✅ `backend/config/settings.py` - Production-ready Django settings
 - ✅ `backend/.env.example` - Environment variables template
-- ✅ `backend/render.yaml` - Render deployment config
+- ✅ `render.yaml` - Render deployment config
 - ✅ `backend/Procfile` - Process file
 - ✅ `backend/build.sh` - Build script
 

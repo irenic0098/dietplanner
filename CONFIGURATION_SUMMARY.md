@@ -32,7 +32,7 @@ Contains all Python dependencies needed for production:
 #### 3. `backend/.env.example` ✅
 Template for environment variables with all required keys
 
-#### 4. `backend/render.yaml` ✅
+#### 4. `render.yaml` ✅
 Render deployment configuration with:
 - Build command (install, migrate, collect static)
 - Start command (gunicorn)
