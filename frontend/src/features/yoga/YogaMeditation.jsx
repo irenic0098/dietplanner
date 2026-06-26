@@ -377,6 +377,9 @@ export default function YogaMeditation() {
   const [yogaStats,       setYogaStats]       = useState(null);
   const [loading,         setLoading]         = useState(true);
   const [loadingStats,    setLoadingStats]    = useState(true);
+  const [youtubeVideos,   setYoutubeVideos]   = useState([]);
+  const [loadingYoutube,  setLoadingYoutube]  = useState(false);
+  const [searchSource,    setSearchSource]    = useState('local'); // 'local' | 'youtube' | 'all'
 
   const [activeCategory,  setActiveCategory]  = useState('all');
   const [searchQuery,     setSearchQuery]     = useState('');
@@ -408,6 +411,35 @@ export default function YogaMeditation() {
     }
   }, [activeCategory, searchQuery]);
 
+  const fetchYoutubeVideos = useCallback(async () => {
+    if (!searchQuery.trim()) {
+      setYoutubeVideos([]);
+      return;
+    }
+    
+    setLoadingYoutube(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('query', searchQuery.trim());
+      if (activeCategory !== 'all') params.set('category', activeCategory);
+      params.set('max_results', '20');
+
+      const res = await client.get(`yoga/videos/youtube_search/?${params}`);
+      setYoutubeVideos(res.data.results || []);
+    } catch (err) {
+      console.error(err);
+      const errorMsg = err.response?.data?.error || err.message;
+      if (errorMsg.includes('API key') || errorMsg.includes('not configured')) {
+        toast.error('YouTube API key not configured. Please add YOUTUBE_API_KEY to backend .env file.');
+      } else {
+        toast.error('Could not search YouTube videos.');
+      }
+      setYoutubeVideos([]);
+    } finally {
+      setLoadingYoutube(false);
+    }
+  }, [searchQuery, activeCategory]);
+
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
@@ -423,6 +455,15 @@ export default function YogaMeditation() {
 
   useEffect(() => { fetchVideos(); }, [fetchVideos]);
   useEffect(() => { fetchStats(); }, [fetchStats]);
+  
+  // Fetch YouTube videos when search query changes and source is YouTube
+  useEffect(() => {
+    if (searchSource === 'youtube' && searchQuery.trim()) {
+      fetchYoutubeVideos();
+    } else if (searchSource === 'local') {
+      setYoutubeVideos([]);
+    }
+  }, [searchQuery, searchSource, fetchYoutubeVideos]);
 
   /* ── Handlers ── */
   const handleBookmark = async (videoId) => {
@@ -595,10 +636,10 @@ export default function YogaMeditation() {
                 <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="text"
-                  placeholder="Search videos or instructors…"
+                  placeholder={searchSource === 'youtube' ? 'Search YouTube for yoga & meditation videos…' : 'Search videos or instructors…'}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && fetchVideos()}
+                  onKeyDown={e => e.key === 'Enter' && (searchSource === 'youtube' ? fetchYoutubeVideos() : fetchVideos())}
                   style={{
                     width: '100%', padding: '10px 14px 10px 40px',
                     borderRadius: '12px', border: '1px solid var(--border)',
@@ -608,12 +649,45 @@ export default function YogaMeditation() {
                 />
                 {searchQuery && (
                   <button
-                    onClick={() => { setSearchQuery(''); }}
+                    onClick={() => { setSearchQuery(''); setYoutubeVideos([]); }}
                     style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
                   ><X size={14} /></button>
                 )}
               </div>
-              <button onClick={fetchVideos} className="btn btn-secondary" style={{ padding: '10px 16px', display: 'flex', gap: 6, fontSize: '0.85rem' }}>
+              
+              {/* Search Source Toggle */}
+              <div style={{ display: 'flex', gap: 4, background: 'var(--bg-secondary)', padding: 4, borderRadius: 10, border: '1px solid var(--border)' }}>
+                <button
+                  onClick={() => { setSearchSource('local'); setYoutubeVideos([]); fetchVideos(); }}
+                  style={{
+                    padding: '8px 14px', borderRadius: 8, border: 'none',
+                    background: searchSource === 'local' ? 'var(--primary)' : 'transparent',
+                    color: searchSource === 'local' ? '#fff' : 'var(--text-secondary)',
+                    fontWeight: '600', fontSize: '0.8rem', cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  📚 Library
+                </button>
+                <button
+                  onClick={() => { setSearchSource('youtube'); }}
+                  style={{
+                    padding: '8px 14px', borderRadius: 8, border: 'none',
+                    background: searchSource === 'youtube' ? '#ff0000' : 'transparent',
+                    color: searchSource === 'youtube' ? '#fff' : 'var(--text-secondary)',
+                    fontWeight: '600', fontSize: '0.8rem', cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  YouTube
+                </button>
+              </div>
+              
+              <button 
+                onClick={searchSource === 'youtube' ? fetchYoutubeVideos : fetchVideos} 
+                className="btn btn-secondary" 
+                style={{ padding: '10px 16px', display: 'flex', gap: 6, fontSize: '0.85rem' }}
+              >
                 <RefreshCw size={15} /> Search
               </button>
             </div>
@@ -639,6 +713,50 @@ export default function YogaMeditation() {
                   <p style={{ color: 'var(--text-muted)' }}>Loading yoga sessions…</p>
                 </div>
               </div>
+            ) : searchSource === 'youtube' ? (
+              <>
+                {loadingYoutube ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+                      <Loader size={36} color="#ff0000" style={{ animation: 'spin 1s linear infinite' }} />
+                      <p style={{ color: 'var(--text-muted)' }}>Searching YouTube…</p>
+                    </div>
+                  </div>
+                ) : youtubeVideos.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>🔍</div>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: 8 }}>No YouTube videos found</h3>
+                    <p>Try a different search term or switch to Library mode.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(255,0,0,0.08)', border: '1px solid rgba(255,0,0,0.2)', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: '1.2rem' }}>📺</span>
+                      <div>
+                        <p style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                          {youtubeVideos.length} videos from YouTube
+                        </p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          {youtubeVideos.length > 0 && youtubeVideos[0].is_from_youtube ? 
+                            'Results are fetched live from YouTube based on your search' : 
+                            'Showing curated yoga & meditation videos (add YouTube API key for live search)'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="yoga-videos-grid">
+                      {youtubeVideos.map((v, index) => (
+                        <VideoCard 
+                          key={`youtube-${index}`} 
+                          video={{...v, id: `youtube-${index}`, is_bookmarked: false, is_completed_today: false}} 
+                          onPlay={handlePlay} 
+                          onBookmark={() => toast.info('Bookmarking YouTube videos is not available yet')} 
+                          onComplete={() => toast.info('Completing YouTube videos is not available yet')} 
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             ) : videos.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--text-muted)' }}>
                 <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>🧘</div>

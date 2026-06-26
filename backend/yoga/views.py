@@ -5,6 +5,7 @@ from django.db.models import Q
 from datetime import date, timedelta
 from .models import YogaVideo, YogaLog, UserYogaStats
 from .serializers import YogaVideoSerializer, YogaLogSerializer, UserYogaStatsSerializer
+from .youtube_service import YouTubeSearchService
 
 class YogaVideoViewSet(viewsets.ModelViewSet):
     queryset = YogaVideo.objects.all()
@@ -94,6 +95,28 @@ class YogaVideoViewSet(viewsets.ModelViewSet):
         videos = YogaVideo.objects.filter(bookmarked_by=request.user)
         serializer = self.get_serializer(videos, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def youtube_search(self, request):
+        """Search YouTube for yoga and meditation videos."""
+        query = request.query_params.get('query', '')
+        category = request.query_params.get('category', None)
+        max_results = int(request.query_params.get('max_results', 20))
+        
+        if not query:
+            return Response(
+                {'error': 'Query parameter is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            youtube_service = YouTubeSearchService()
+            videos = youtube_service.search_videos(query, max_results, category)
+            return Response({'results': videos})
+        except Exception as e:
+            # Return empty results instead of error to allow fallback to work
+            print(f"YouTube search error: {e}")
+            return Response({'results': []})
 
 class YogaStatsViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
