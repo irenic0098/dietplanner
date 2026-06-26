@@ -24,8 +24,9 @@ services:
       - key: DEBUG
         value: "False"
       # Set these as secrets in the Render dashboard:
-      # SECRET_KEY, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT,
-      # ALLOWED_HOSTS, FRONTEND_URL
+      # SECRET_KEY, DB_NAME, DB_USER (postgres.your-project-ref), DB_PASSWORD,
+      # DB_HOST, DB_PORT (5432 session pooler or direct), DB_PROJECT_REF,
+      # DATABASE_URL (optional), ALLOWED_HOSTS, FRONTEND_URL
 
     healthCheckPath: /api/health/
 
