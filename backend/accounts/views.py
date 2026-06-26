@@ -2,7 +2,6 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser, UserProfile
 from .serializers import (
     RegisterSerializer,
@@ -19,6 +18,24 @@ class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        refresh = MyTokenObtainPairSerializer.get_token(user)
+
+        return Response(
+            {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': user.role,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class UserProfileView(APIView):
@@ -50,40 +67,6 @@ class CurrentUserView(APIView):
     def get(self, request):
         serializer = CustomUserSerializer(request.user)
         return Response(serializer.data)
-
-
-class GoogleSignInView(APIView):
-    permission_classes = (permissions.AllowAny,)
-
-    def post(self, request):
-        token = request.data.get('token')
-        email = request.data.get('email')
-        username = request.data.get('username')
-
-        if not email:
-            return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if not username:
-            username = email.split('@')[0]
-
-        user, created = CustomUser.objects.get_or_create(
-            email=email,
-            defaults={'username': username, 'role': 'user'}
-        )
-
-        if created:
-            UserProfile.objects.get_or_create(user=user)
-
-        refresh = MyTokenObtainPairSerializer.get_token(user)
-
-        return Response({
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-            'username': user.username,
-            'role': user.role,
-            'email': user.email,
-            'id': user.id
-        })
 
 
 # ===========================================================================

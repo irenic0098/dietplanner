@@ -1,97 +1,178 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuthStore } from '../../store/authStore';
+import { Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuthStore } from '../../store/authStore';
+import AuthLayout from './AuthLayout';
+
+const MIN_PASSWORD_LENGTH = 8;
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register, error, loading } = useAuthStore();
+  const { register, error, fieldErrors, loading, clearAuthError } = useAuthStore();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('user');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [localErrors, setLocalErrors] = useState({});
+
+  const validateForm = () => {
+    const nextErrors = {};
+
+    if (username.trim().length < 3) {
+      nextErrors.username = 'Username must be at least 3 characters.';
+    }
+
+    if (!email.trim()) {
+      nextErrors.email = 'Email is required.';
+    }
+
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      nextErrors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    }
+
+    if (password !== passwordConfirm) {
+      nextErrors.password_confirm = 'Passwords do not match.';
+    }
+
+    setLocalErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username || !email || !password) {
-      return toast.error('Please enter all fields');
+    clearAuthError();
+    setLocalErrors({});
+
+    if (!validateForm()) {
+      return toast.error('Please fix the highlighted fields.');
     }
-    const success = await register(username, email, password, role);
-    if (success) {
-      toast.success('Registration successful! Please login.');
-      navigate('/login');
-    } else {
-      toast.error('Registration failed. Username may exist.');
+
+    const result = await register({
+      username,
+      email,
+      password,
+      passwordConfirm,
+    });
+
+    if (result.success) {
+      toast.success('Account created successfully!');
+      navigate('/dashboard', { replace: true });
+      return;
     }
+
+    toast.error(result.message || 'Registration failed.');
   };
 
+  const getFieldError = (field) => localErrors[field] || fieldErrors[field];
+
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'radial-gradient(circle, var(--accent-light) 0%, var(--bg-primary) 100%)' }}>
-      <div className="glass animate-fade-in" style={{ width: '400px', padding: '40px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)' }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: '800' }}>Create Account</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '8px' }}>Join the ultimate health management system</p>
+    <AuthLayout
+      title="Create your account"
+      subtitle="Join DietPlanner to track meals, goals, and progress in one place."
+    >
+      {error && !Object.keys(fieldErrors).length && (
+        <div className="auth-alert">{error}</div>
+      )}
+
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="form-group">
+          <label htmlFor="username">Username</label>
+          <input
+            id="username"
+            type="text"
+            autoComplete="username"
+            placeholder="Choose a username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className={getFieldError('username') ? 'input-error' : ''}
+            required
+            disabled={loading}
+          />
+          {getFieldError('username') && (
+            <span className="auth-field-error">{getFieldError('username')}</span>
+          )}
         </div>
 
-        {error && (
-          <div style={{ background: 'var(--danger)', color: 'white', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '16px', fontSize: '0.85rem', textAlign: 'center' }}>
-            {error}
-          </div>
-        )}
+        <div className="form-group">
+          <label htmlFor="email">Email address</label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={getFieldError('email') ? 'input-error' : ''}
+            required
+            disabled={loading}
+          />
+          {getFieldError('email') && (
+            <span className="auth-field-error">{getFieldError('email')}</span>
+          )}
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Username</label>
-            <input 
-              type="text" 
-              placeholder="Pick a username" 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Email Address</label>
-            <input 
-              type="email" 
-              placeholder="name@example.com" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Password</label>
-            <input 
-              type="password" 
-              placeholder="Choose a strong password" 
+        <div className="form-group">
+          <label htmlFor="password">Password</label>
+          <div className="auth-input-wrap">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              placeholder="Create a strong password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className={getFieldError('password') ? 'input-error' : ''}
+              required
+              disabled={loading}
             />
+            <button
+              type="button"
+              className="auth-toggle-password"
+              onClick={() => setShowPassword((prev) => !prev)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
+          <span className="auth-hint">At least {MIN_PASSWORD_LENGTH} characters</span>
+          {getFieldError('password') && (
+            <span className="auth-field-error">{getFieldError('password')}</span>
+          )}
+        </div>
 
-          <div className="form-group">
-            <label>Role</label>
-            <select value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="user">Standard User</option>
-              <option value="dietitian">Professional Dietitian</option>
-            </select>
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            style={{ width: '100%', marginTop: '12px' }}
+        <div className="form-group">
+          <label htmlFor="passwordConfirm">Confirm password</label>
+          <input
+            id="passwordConfirm"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            placeholder="Re-enter your password"
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+            className={getFieldError('password_confirm') ? 'input-error' : ''}
+            required
             disabled={loading}
-          >
-            {loading ? 'Creating...' : 'Register'}
-          </button>
-        </form>
+          />
+          {getFieldError('password_confirm') && (
+            <span className="auth-field-error">{getFieldError('password_confirm')}</span>
+          )}
+        </div>
 
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', marginTop: '24px' }}>
-          Already have an account? <Link to="/login" style={{ color: 'var(--primary)', fontWeight: 'bold', textDecoration: 'none' }}>Login here</Link>
-        </p>
-      </div>
-    </div>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          style={{ width: '100%', marginTop: '8px' }}
+          disabled={loading}
+        >
+          {loading ? 'Creating account...' : 'Create account'}
+        </button>
+      </form>
+
+      <p className="auth-footer">
+        Already have an account? <Link to="/login">Sign in</Link>
+      </p>
+    </AuthLayout>
   );
 }

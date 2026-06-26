@@ -1,3 +1,4 @@
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from .models import CustomUser, UserProfile
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -25,21 +26,35 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
-    
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True)
+
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'password', 'role']
+        fields = ['username', 'email', 'password', 'password_confirm']
+
+    def validate_username(self, value):
+        username = value.strip()
+        if len(username) < 3:
+            raise serializers.ValidationError('Username must be at least 3 characters.')
+        return username
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs.pop('password_confirm'):
+            raise serializers.ValidationError({'password_confirm': 'Passwords do not match.'})
+        validate_password(attrs['password'])
+        return attrs
 
     def create(self, validated_data):
-        role = validated_data.get('role', 'user')
         user = CustomUser.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
             password=validated_data['password'],
-            role=role
+            role='user',
         )
-        # Create user profile
         UserProfile.objects.create(user=user)
         return user
 

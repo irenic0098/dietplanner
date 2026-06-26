@@ -5,7 +5,6 @@ from .views import (
     MyTokenObtainPairView,
     UserProfileView,
     CurrentUserView,
-    GoogleSignInView,
     GenerateDietPlanView,
 )
 
@@ -15,6 +14,5 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('profile/', UserProfileView.as_view(), name='user_profile'),
     path('me/', CurrentUserView.as_view(), name='current_user'),
-    path('google-login/', GoogleSignInView.as_view(), name='google_login'),
     path('generate-diet-plan/', GenerateDietPlanView.as_view(), name='generate_diet_plan'),
 ]
