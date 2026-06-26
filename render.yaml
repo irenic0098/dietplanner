@@ -23,10 +23,26 @@ services:
         value: production
       - key: DEBUG
         value: "False"
-      # Set these as secrets in the Render dashboard:
-      # SECRET_KEY, DB_NAME, DB_USER (postgres.your-project-ref), DB_PASSWORD,
-      # DB_HOST, DB_PORT (5432 session pooler or direct), DB_PROJECT_REF,
-      # DATABASE_URL (optional), ALLOWED_HOSTS, FRONTEND_URL
+      - key: DB_ENGINE
+        value: postgresql
+      - key: DB_HOST
+        value: aws-1-ap-southeast-1.pooler.supabase.com
+      - key: DB_NAME
+        value: postgres
+      - key: DB_PORT
+        value: "6543"
+      - key: DB_USER
+        value: postgres
+      - key: FRONTEND_URL
+        value: https://dietplanner.vercel.app
+      - key: ALLOWED_HOSTS
+        value: your-render-app.onrender.com,localhost
+      - key: DB_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DB_PROJECT_REF
+        sync: false
 
     healthCheckPath: /api/health/
 

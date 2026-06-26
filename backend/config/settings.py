@@ -32,7 +32,11 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 # Configure allowed hosts
 if ENVIRONMENT == 'production':
-    ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
+    ALLOWED_HOSTS = [
+        host.strip()
+        for host in os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
+        if host.strip()
+    ]
 else:
     ALLOWED_HOSTS = ['*']
 
@@ -103,12 +107,36 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 # Use PostgreSQL in production, SQLite in development
 
+def _get_supabase_project_ref():
+    project_ref = os.getenv('DB_PROJECT_REF', '').strip()
+    if project_ref:
+        return project_ref
+
+    supabase_url = os.getenv('SUPABASE_URL', '').strip()
+    if supabase_url:
+        from urllib.parse import urlparse
+
+        hostname = urlparse(supabase_url).hostname or ''
+        if hostname.endswith('.supabase.co'):
+            return hostname.removesuffix('.supabase.co')
+
+    return ''
+
+
 def _supabase_db_user():
     """Supabase pooler requires postgres.[project-ref], not plain postgres."""
     db_user = os.getenv('DB_USER', 'postgres').strip()
-    project_ref = os.getenv('DB_PROJECT_REF', '').strip()
-    if project_ref and '.' not in db_user:
+    if '.' in db_user:
+        return db_user
+
+    db_host = os.getenv('DB_HOST', '')
+    if 'pooler.supabase.com' not in db_host:
+        return db_user
+
+    project_ref = _get_supabase_project_ref()
+    if project_ref:
         return f'{db_user}.{project_ref}'
+
     return db_user
 
 
@@ -128,6 +156,7 @@ if ENVIRONMENT == 'production':
         db_port = os.getenv('DB_PORT', '5432')
         db_host = os.getenv('DB_HOST', 'localhost')
         use_pooler = 'pooler.supabase.com' in db_host
+        use_transaction_pooler = db_port == '6543'
 
         DATABASES = {
             'default': {
@@ -138,12 +167,15 @@ if ENVIRONMENT == 'production':
                 'HOST': db_host,
                 'PORT': db_port,
                 # Transaction pooler (6543) must not keep persistent connections.
-                'CONN_MAX_AGE': 0 if db_port == '6543' or use_pooler else 600,
+                'CONN_MAX_AGE': 0 if use_transaction_pooler or use_pooler else 600,
                 'OPTIONS': {
                     'sslmode': 'require',
                 },
             }
         }
+
+        if use_transaction_pooler:
+            DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
 else:
     DATABASES = {
         'default': {
@@ -231,11 +263,8 @@ SIMPLE_JWT = {
 
 # CORS Configuration
 if ENVIRONMENT == 'production':
-    _frontend_url = os.getenv('FRONTEND_URL', 'https://dietplannar.vercel.app').rstrip('/')
-    CORS_ALLOWED_ORIGINS = list(dict.fromkeys([
-        "https://dietplannar.vercel.app",
-        _frontend_url,
-    ]))
+    _frontend_url = os.getenv('FRONTEND_URL', 'https://dietplanner.vercel.app').rstrip('/')
+    CORS_ALLOWED_ORIGINS = [_frontend_url]
     CORS_ALLOW_CREDENTIALS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = True
@@ -253,10 +282,7 @@ if ENVIRONMENT == 'production':
         "script-src": ("'self'", "'unsafe-inline'"),
         "style-src": ("'self'", "'unsafe-inline'"),
     }
-    CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([
-        "https://dietplannar.vercel.app",
-        _frontend_url,
-    ]))
+    CSRF_TRUSTED_ORIGINS = [_frontend_url]
 else:
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
