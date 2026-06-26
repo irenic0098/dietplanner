@@ -2,34 +2,31 @@ services:
   - type: web
     name: dietplanner-backend
     env: python
-    pythonVersion: 3.11.15
     rootDirectory: backend
     plan: free
 
-    buildCommand: |
-      python -m pip install --upgrade pip setuptools wheel && \
-      pip install --no-cache-dir -r requirements.txt && \
-      python manage.py migrate && \
-      python manage.py collectstatic --no-input
+    buildCommand: bash build.sh
 
-    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:8000
+    startCommand: >-
+      python manage.py migrate --noinput &&
+      gunicorn config.wsgi:application
+      --bind 0.0.0.0:$PORT
+      --workers 2
+      --timeout 120
+      --access-logfile -
+      --error-logfile -
 
-    # Environment Variables (set in Render dashboard as secrets)
-    # ENVIRONMENT=production
-    # DEBUG=False
-    # SECRET_KEY=your-secret-key
-    # DB_NAME=postgres
-    # DB_USER=postgres
-    # DB_PASSWORD=your-password
-    # DB_HOST=aws-1-ap-southeast-1.pooler.supabase.com
-    # DB_PORT=6543
-    # FRONTEND_URL=https://your-vercel-domain.vercel.app
-    # ALLOWED_HOSTS=your-render-url.onrender.com
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.15
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "False"
+      # Set these as secrets in the Render dashboard:
+      # SECRET_KEY, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT,
+      # ALLOWED_HOSTS, FRONTEND_URL
 
-    routes:
-      - path: /
-        matchType: prefix
-
-    healthCheckPath: /admin/
+    healthCheckPath: /api/health/
 
     autoDeploy: true

@@ -202,10 +202,11 @@ SIMPLE_JWT = {
 
 # CORS Configuration
 if ENVIRONMENT == 'production':
-    CORS_ALLOWED_ORIGINS = [
-        "https://dietplannar.vercel.app",  # Update with your Vercel domain
-        os.getenv('FRONTEND_URL', 'https://dietplannar.vercel.app'),
-    ]
+    _frontend_url = os.getenv('FRONTEND_URL', 'https://dietplannar.vercel.app').rstrip('/')
+    CORS_ALLOWED_ORIGINS = list(dict.fromkeys([
+        "https://dietplannar.vercel.app",
+        _frontend_url,
+    ]))
     CORS_ALLOW_CREDENTIALS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = True
@@ -213,6 +214,7 @@ else:
 
 # Security Settings for Production
 if ENVIRONMENT == 'production':
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
@@ -222,10 +224,10 @@ if ENVIRONMENT == 'production':
         "script-src": ("'self'", "'unsafe-inline'"),
         "style-src": ("'self'", "'unsafe-inline'"),
     }
-    CSRF_TRUSTED_ORIGINS = [
+    CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([
         "https://dietplannar.vercel.app",
-        os.getenv('FRONTEND_URL', 'https://dietplannar.vercel.app'),
-    ]
+        _frontend_url,
+    ]))
 else:
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
