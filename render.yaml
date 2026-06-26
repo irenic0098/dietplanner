@@ -36,7 +36,7 @@ services:
       - key: FRONTEND_URL
         value: https://dietplanner.vercel.app
       - key: ALLOWED_HOSTS
-        value: your-render-app.onrender.com,localhost
+        value: dietplanner-1-b8jo.onrender.com,localhost
       - key: DB_PASSWORD
         sync: false
       - key: SECRET_KEY
