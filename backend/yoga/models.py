@@ -9,6 +9,8 @@ class YogaVideo(models.Model):
         ('stress_relief', 'Meditation for Stress Relief'),
         ('morning', 'Morning Yoga Routine'),
         ('beginner', 'Beginner Yoga Classes'),
+        ('yoga', 'General Yoga'),
+        ('meditation', 'General Meditation'),
     )
     DIFFICULTY_CHOICES = (
         ('beginner', 'Beginner'),
@@ -17,6 +19,11 @@ class YogaVideo(models.Model):
     )
     title = models.CharField(max_length=200)
     youtube_id = models.CharField(max_length=50, help_text="YouTube Video ID (e.g. dQw4w9WgXcQ)")
+    video_source = models.CharField(
+        max_length=20, 
+        default='youtube', 
+        choices=(('youtube', 'YouTube'), ('dailymotion', 'Dailymotion'))
+    )
     category = models.CharField(max_length=30, choices=CATEGORY_CHOICES)
     duration_mins = models.IntegerField(default=15)
     instructor = models.CharField(max_length=100)

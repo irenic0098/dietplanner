@@ -10,7 +10,6 @@ import Register from './features/auth/Register';
 import UserDashboard from './features/dashboard/UserDashboard';
 import DailyTracking from './features/tracking/DailyTracking';
 import WeightTrend from './features/tracking/WeightTrend';
-import MealPlanner from './features/meals/MealPlanner';
 import FoodSearch from './features/meals/FoodSearch';
 import DietPlanGenerator from './features/meals/DietPlanGenerator';
 import AICoach from './features/ai/AICoach';
@@ -119,17 +118,6 @@ export default function App() {
               <PrivateRoute>
                 <Layout>
                   <WeightTrend />
-                </Layout>
-              </PrivateRoute>
-            }
-          />
-
-          <Route
-            path="/meals"
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <MealPlanner />
                 </Layout>
               </PrivateRoute>
             }

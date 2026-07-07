@@ -19,26 +19,34 @@ class YouTubeSearchService:
                 print(f"Failed to initialize YouTube API client: {e}")
                 self.use_api = False
     
-    def search_videos(self, query, max_results=20, category=None):
+    def search_videos(self, query, max_results=20, category=None, page=1):
         """
-        Search for YouTube videos related to yoga and meditation.
-        
-        Args:
-            query (str): Search query
-            max_results (int): Maximum number of results to return (default: 20)
-            category (str): Optional category filter (yoga, meditation, etc.)
-        
-        Returns:
-            list: List of video dictionaries with video details
+        Search for videos related to yoga and meditation using multiple fallbacks.
         """
-        # Try YouTube API first if available
+        # 1. Try YouTube Data API first if available
         if self.use_api:
             try:
+                print("Trying YouTube Data API...")
                 return self._search_with_api(query, max_results, category)
             except Exception as e:
-                print(f"YouTube API search failed: {e}, falling back to sample videos")
+                print(f"YouTube API search failed: {e}")
         
-        # Fallback to sample videos
+        # 2. Fallback: Try Invidious (YouTube search without API key)
+        try:
+            print("Trying Invidious API...")
+            return self._search_with_invidious(query, max_results, category, page)
+        except Exception as e:
+            print(f"Invidious API failed: {e}")
+            
+        # 3. Fallback: Try Dailymotion API
+        try:
+            print("Trying Dailymotion API...")
+            return self._search_with_dailymotion(query, max_results, category, page)
+        except Exception as e:
+            print(f"Dailymotion API failed: {e}")
+
+        # 4. Final Fallback: Curated local videos (no pagination needed)
+        print("All APIs failed, falling back to curated local videos.")
         return self._get_sample_videos(query, category, max_results)
     
     def _search_with_api(self, query, max_results, category):
@@ -51,8 +59,8 @@ class YouTubeSearchService:
             maxResults=max_results,
             type='video',
             order='relevance',
-            videoDuration='medium',
-            relevanceLanguage='en'
+            videoDuration='medium'
+            # No relevanceLanguage filter — return videos in all languages
         ).execute()
         
         video_ids = [item['id']['videoId'] for item in search_response['items']]
@@ -67,6 +75,11 @@ class YouTubeSearchService:
     def _get_sample_videos(self, query, category, max_results):
         """Return curated sample yoga/meditation videos when API is unavailable."""
         sample_videos = self._get_curated_videos()
+        
+        # Ensure video_source is present
+        for v in sample_videos:
+            if 'video_source' not in v:
+                v['video_source'] = 'youtube'
         
         # Filter by category if specified
         if category and category != 'all':
@@ -261,30 +274,35 @@ class YouTubeSearchService:
         ]
     
     def _build_search_query(self, query, category=None):
-        """Build search query with yoga/meditation context."""
-        # Define category-specific keywords
-        category_keywords = {
-            'weight_loss': 'yoga for weight loss fat burn',
-            'weight_gain': 'yoga strength building muscle',
-            'belly_fat': 'yoga for belly fat stomach',
-            'stress_relief': 'meditation stress relief calm',
-            'morning': 'morning yoga routine wake up',
-            'beginner': 'beginner yoga basics easy',
-            'yoga': 'yoga practice routine',
-            'meditation': 'meditation mindfulness guided'
+        """
+        Build search query preserving the user's exact language.
+        We only add minimal neutral keywords when no query text is given.
+        """
+        # Category fallback keywords (used ONLY when no user query is present)
+        category_fallbacks = {
+            'weight_loss': 'yoga weight loss',
+            'weight_gain': 'yoga strength muscle',
+            'belly_fat': 'yoga belly fat core',
+            'stress_relief': 'meditation stress relief',
+            'morning': 'morning yoga',
+            'beginner': 'beginner yoga',
+            'yoga': 'yoga',
+            'meditation': 'meditation'
         }
-        
-        # Add category context if provided
-        if category and category in category_keywords:
-            base_query = category_keywords[category]
-            if query and query.strip():
-                return f"{base_query} {query}"
-            return base_query
-        
-        # Default yoga/meditation context
-        if query and query.strip():
-            return f"yoga meditation {query}"
-        return "yoga meditation practice"
+
+        user_query = query.strip() if query else ''
+
+        if user_query:
+            # Use the user's query exactly as typed — supports any language
+            if category and category in category_fallbacks:
+                # Append a small neutral category hint only if no overlap
+                return user_query
+            return user_query
+
+        # No user query — use category fallback or generic
+        if category and category in category_fallbacks:
+            return category_fallbacks[category]
+        return 'yoga meditation'
     
     def _format_video_data(self, video, category=None):
         """Format YouTube video data to match our YogaVideo model structure."""
@@ -297,6 +315,7 @@ class YouTubeSearchService:
         
         return {
             'youtube_id': video['id'],
+            'video_source': 'youtube',
             'title': snippet['title'],
             'instructor': snippet['channelTitle'],
             'thumbnail_url': snippet['thumbnails'].get('high', {}).get('url') or 
@@ -397,3 +416,122 @@ class YouTubeSearchService:
         }
         
         return benefit_matrix.get(benefit_type, {}).get(category, 'Medium')
+
+    def _search_with_invidious(self, query, max_results, category, page=1):
+        """Search using public Invidious instances (YouTube search fallback)."""
+        search_query = self._build_search_query(query, category)
+        # Use popular public Invidious instances (ordered by reliability)
+        instances = [
+            'https://invidious.flokinet.to',
+            'https://yewtu.be',
+            'https://invidious.nerdvpn.de',
+            'https://inv.nadeko.net',
+            'https://invidious.privacyredirect.com',
+            'https://invidious.projectsegfau.lt',
+            'https://inv.tux.pizza',
+            'https://invidious.incogniweb.net',
+        ]
+        
+        for instance in instances:
+            try:
+                url = f"{instance}/api/v1/search"
+                response = requests.get(
+                    url, 
+                    params={'q': search_query, 'type': 'video', 'page': page}, 
+                    timeout=6
+                )
+                if response.status_code == 200:
+                    results = response.json()
+                    formatted_videos = []
+                    for item in results[:max_results]:
+                        video_id = item.get('videoId')
+                        if not video_id:
+                            continue
+                        
+                        length_sec = item.get('lengthSeconds', 600)
+                        duration = max(1, round(length_sec / 60))
+                        
+                        # Format thumbnails
+                        thumbnails = item.get('videoThumbnails', [])
+                        thumb_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+                        if thumbnails:
+                            thumb_url = thumbnails[0].get('url') or thumb_url
+                            if thumb_url.startswith('//'):
+                                thumb_url = f"https:{thumb_url}"
+                                
+                        formatted_videos.append({
+                            'youtube_id': video_id,
+                            'video_source': 'youtube',
+                            'title': item.get('title'),
+                            'instructor': item.get('author', 'YouTube Instructor'),
+                            'thumbnail_url': thumb_url,
+                            'duration_mins': duration,
+                            'category': category or 'yoga',
+                            'difficulty': self._estimate_difficulty(item.get('title', ''), item.get('description', '')),
+                            'calorie_burn': self._estimate_calorie_burn(duration, category),
+                            'flexibility': self._estimate_benefit_level('flexibility', category),
+                            'relaxation': self._estimate_benefit_level('relaxation', category),
+                            'strength': self._estimate_benefit_level('strength', category),
+                            'view_count': int(item.get('viewCount', 0)),
+                            'published_at': None,
+                            'description': item.get('description', ''),
+                            'is_from_youtube': True
+                        })
+                    if formatted_videos:
+                        print(f"Successfully fetched videos from Invidious instance: {instance}")
+                        return formatted_videos
+            except Exception as e:
+                print(f"Invidious instance {instance} failed: {e}")
+                continue
+                
+        raise Exception("All Invidious instances failed")
+
+    def _search_with_dailymotion(self, query, max_results, category, page=1):
+        """Search using Dailymotion API."""
+        search_query = self._build_search_query(query, category)
+        try:
+            url = "https://api.dailymotion.com/videos"
+            params = {
+                'fields': 'id,title,thumbnail_720_url,duration,owner.screenname,description,views_total',
+                'search': search_query,
+                'limit': max_results,
+                'page': page,
+            }
+            response = requests.get(url, params=params, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                formatted_videos = []
+                for item in data.get('list', []):
+                    video_id = item.get('id')
+                    if not video_id:
+                        continue
+                        
+                    duration_sec = item.get('duration', 900)
+                    duration_mins = max(1, round(duration_sec / 60))
+                    
+                    formatted_videos.append({
+                        'youtube_id': video_id,
+                        'video_source': 'dailymotion',
+                        'title': item.get('title'),
+                        'instructor': item.get('owner.screenname', 'Dailymotion Instructor'),
+                        'thumbnail_url': item.get('thumbnail_720_url') or f"https://www.dailymotion.com/thumbnail/video/{video_id}",
+                        'duration_mins': duration_mins,
+                        'category': category or 'yoga',
+                        'difficulty': self._estimate_difficulty(item.get('title', ''), item.get('description', '')),
+                        'calorie_burn': self._estimate_calorie_burn(duration_mins, category),
+                        'flexibility': self._estimate_benefit_level('flexibility', category),
+                        'relaxation': self._estimate_benefit_level('relaxation', category),
+                        'strength': self._estimate_benefit_level('strength', category),
+                        'view_count': int(item.get('views_total', 0)),
+                        'published_at': None,
+                        'description': item.get('description', ''),
+                        'is_from_youtube': False,
+                        'is_from_dailymotion': True
+                    })
+                if formatted_videos:
+                    print("Successfully fetched videos from Dailymotion API")
+                    return formatted_videos
+        except Exception as e:
+            print(f"Dailymotion API search failed: {e}")
+            
+        raise Exception("Dailymotion search failed")

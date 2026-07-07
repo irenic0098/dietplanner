@@ -45,7 +45,6 @@ export default function Sidebar({ onClose }) {
     { to: '/dashboard',    label: 'Dashboard',            icon: LayoutDashboard },
     { to: '/tracking',     label: 'Daily Tracking',        icon: Activity },
     { to: '/weight-trend', label: 'Weight Trend',          icon: TrendingDown },
-    { to: '/meals',        label: 'Meal Planner',          icon: Utensils },
     { to: '/diet-plan',    label: 'Diet Plan',             icon: ClipboardList },
     { to: '/foods',        label: 'Food Search',           icon: Search },
     { to: '/ai-coach',     label: 'AI Coach',              icon: Sparkles },

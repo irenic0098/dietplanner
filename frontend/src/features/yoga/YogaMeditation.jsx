@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import client from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -64,13 +64,19 @@ function VideoCard({ video, onPlay, onBookmark, onComplete }) {
         }}
       >
         <img
-          src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`}
+          src={video.thumbnail_url || (
+            video.video_source === 'dailymotion' || video.is_from_dailymotion
+              ? `https://www.dailymotion.com/thumbnail/video/${video.youtube_id}`
+              : `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`
+          )}
           alt={video.title}
           style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' }}
           onError={e => {
             const img = e.currentTarget;
             if (video.thumbnail_url && img.src === video.thumbnail_url) {
-              img.src = `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`;
+              img.src = video.video_source === 'dailymotion' || video.is_from_dailymotion
+                ? `https://www.dailymotion.com/thumbnail/video/${video.youtube_id}`
+                : `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`;
             } else if (img.src.includes('hqdefault')) {
               img.src = `https://img.youtube.com/vi/${video.youtube_id}/mqdefault.jpg`;
             } else {
@@ -218,7 +224,10 @@ function VideoModal({ video, onClose }) {
         <div style={{ position: 'relative', paddingTop: '56.25%' }}>
           <iframe
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
-            src={`https://www.youtube.com/embed/${video.youtube_id}?autoplay=1&rel=0`}
+            src={video.video_source === 'dailymotion' || video.is_from_dailymotion
+              ? `https://www.dailymotion.com/embed/video/${video.youtube_id}?autoplay=1`
+              : `https://www.youtube.com/embed/${video.youtube_id}?autoplay=1&rel=0`
+            }
             title={video.title}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
@@ -244,95 +253,6 @@ function VideoModal({ video, onClose }) {
   );
 }
 
-/* ─── Challenge Tracker ─────────────────────────────────────────────────────── */
-function ChallengeTracker({ challenge, stats }) {
-  if (!challenge) return null;
-  const pct = Math.min(100, (challenge.progress_days / challenge.target_days) * 100);
-
-  return (
-    <div style={{
-      borderRadius: '24px', padding: '28px',
-      background: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #065f46 100%)',
-      position: 'relative', overflow: 'hidden',
-      marginBottom: 32,
-    }}>
-      {/* Decorative circles */}
-      <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
-      <div style={{ position: 'absolute', bottom: -50, left: 100, width: 150, height: 150, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
-          <div>
-            <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>
-              🏆 Daily Yoga Challenge
-            </div>
-            <h3 style={{ color: '#fff', fontWeight: '800', fontSize: '1.3rem', marginBottom: 6 }}>{challenge.title}</h3>
-            <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.88rem', maxWidth: 500 }}>{challenge.description}</p>
-          </div>
-
-          {/* Streak ring */}
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: 80, height: 80, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.15)', border: '3px solid rgba(255,255,255,0.4)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <span style={{ fontSize: '1.6rem', fontWeight: '900', color: '#fff', lineHeight: 1 }}>
-                {stats?.streak_days || 0}
-              </span>
-              <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.75)', fontWeight: '600', marginTop: 2 }}>STREAK</span>
-            </div>
-            <p style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>Day Streak 🔥</p>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: 'rgba(255,255,255,0.85)', fontSize: '0.82rem', fontWeight: '700' }}>
-            <span>{challenge.progress_days} / {challenge.target_days} days completed</span>
-            <span>{Math.round(pct)}%</span>
-          </div>
-          <div style={{ height: 10, background: 'rgba(255,255,255,0.2)', borderRadius: '99px', overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', width: `${pct}%`,
-              background: 'linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.7) 100%)',
-              borderRadius: '99px',
-              transition: 'width 0.6s ease',
-            }} />
-          </div>
-        </div>
-
-        {/* Day dots */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {Array.from({ length: challenge.target_days }, (_, i) => (
-            <div key={i} style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: i < challenge.progress_days ? '#fff' : 'rgba(255,255,255,0.2)',
-              border: '2px solid rgba(255,255,255,0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.7rem', fontWeight: '700',
-              color: i < challenge.progress_days ? '#10b981' : 'rgba(255,255,255,0.6)',
-              transition: 'all 0.3s',
-            }}>
-              {i < challenge.progress_days ? '✓' : i + 1}
-            </div>
-          ))}
-        </div>
-
-        {challenge.is_completed && (
-          <div style={{
-            marginTop: 16, padding: '10px 16px', borderRadius: '12px',
-            background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)',
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            color: '#fff', fontWeight: '700', fontSize: '0.9rem',
-          }}>
-            <Trophy size={18} /> 🎉 Challenge Completed! You earned 50 XP!
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /* ─── Stats Row ─────────────────────────────────────────────────────────────── */
 function StatsRow({ stats }) {
@@ -369,22 +289,30 @@ function StatsRow({ stats }) {
 export default function YogaMeditation() {
   const { profile } = useAuthStore();
 
-  const [videos,          setVideos]          = useState([]);
-  const [filteredVideos,  setFilteredVideos]  = useState([]);
-  const [recommended,     setRecommended]     = useState([]);
-  const [bookmarked,      setBookmarked]      = useState([]);
-  const [challengeData,   setChallengeData]   = useState(null);
-  const [yogaStats,       setYogaStats]       = useState(null);
-  const [loading,         setLoading]         = useState(true);
-  const [loadingStats,    setLoadingStats]    = useState(true);
-  const [youtubeVideos,   setYoutubeVideos]   = useState([]);
-  const [loadingYoutube,  setLoadingYoutube]  = useState(false);
-  const [searchSource,    setSearchSource]    = useState('local'); // 'local' | 'youtube' | 'all'
+  const [videos,            setVideos]            = useState([]);
+  const [filteredVideos,    setFilteredVideos]    = useState([]);
+  const [recommended,       setRecommended]       = useState([]);
+  const [bookmarked,        setBookmarked]        = useState([]);
+  const [challengeData,     setChallengeData]     = useState(null);
+  const [yogaStats,         setYogaStats]         = useState(null);
+  const [loading,           setLoading]           = useState(true);
+  const [loadingStats,      setLoadingStats]      = useState(true);
+  const [youtubeVideos,     setYoutubeVideos]     = useState([]);
+  const [loadingYoutube,    setLoadingYoutube]    = useState(false);
+  const [loadingMore,       setLoadingMore]       = useState(false);
+  const [ytPage,            setYtPage]            = useState(1);
+  const [ytHasMore,         setYtHasMore]         = useState(false);
+  const [searchSource,      setSearchSource]      = useState('youtube');
+  const [completedTodayIds, setCompletedTodayIds] = useState([]);
 
   const [activeCategory,  setActiveCategory]  = useState('all');
   const [searchQuery,     setSearchQuery]     = useState('');
-  const [activeTab,       setActiveTab]       = useState('discover'); // 'discover' | 'bookmarks' | 'progress'
+  const [activeTab,       setActiveTab]       = useState('discover');
   const [playingVideo,    setPlayingVideo]    = useState(null);
+
+  // Refs for infinite scroll
+  const sentinelRef    = useRef(null);
+  const currentQueryRef = useRef({ query: '', category: 'all' }); // track what we're paginating
 
   /* ── Fetch ── */
   const fetchVideos = useCallback(async () => {
@@ -411,34 +339,79 @@ export default function YogaMeditation() {
     }
   }, [activeCategory, searchQuery]);
 
-  const fetchYoutubeVideos = useCallback(async () => {
-    if (!searchQuery.trim()) {
+  // Core fetch — page 1 (replaces results), or page N (appends)
+  const fetchYoutubeVideos = useCallback(async (overrideQuery, overrideCategory, page = 1, append = false) => {
+    const query = overrideQuery !== undefined ? overrideQuery : searchQuery.trim();
+    const cat   = overrideCategory !== undefined ? overrideCategory : activeCategory;
+
+    if (!query && cat === 'all') {
       setYoutubeVideos([]);
+      setYtHasMore(false);
       return;
     }
-    
-    setLoadingYoutube(true);
+
+    // Track what search we're currently serving (for stale response detection)
+    currentQueryRef.current = { query, category: cat };
+    const thisSearch = { query, category: cat };
+
+    if (append) setLoadingMore(true);
+    else        setLoadingYoutube(true);
+
     try {
       const params = new URLSearchParams();
-      params.set('query', searchQuery.trim());
-      if (activeCategory !== 'all') params.set('category', activeCategory);
+      const effectiveQuery = query || cat.replace(/_/g, ' ');
+      params.set('query', effectiveQuery);
+      if (cat !== 'all') params.set('category', cat);
       params.set('max_results', '20');
+      params.set('page', page);
 
       const res = await client.get(`yoga/videos/youtube_search/?${params}`);
-      setYoutubeVideos(res.data.results || []);
+
+      // Ignore stale responses (user may have changed search while request was in flight)
+      if (currentQueryRef.current.query !== thisSearch.query ||
+          currentQueryRef.current.category !== thisSearch.category) return;
+
+      const newVideos = res.data.results || [];
+      const hasMore   = res.data.has_more ?? (newVideos.length >= 20);
+
+      if (append) {
+        setYoutubeVideos(prev => {
+          // Deduplicate by youtube_id
+          const existingIds = new Set(prev.map(v => v.youtube_id));
+          return [...prev, ...newVideos.filter(v => !existingIds.has(v.youtube_id))];
+        });
+      } else {
+        setYoutubeVideos(newVideos);
+      }
+      setYtPage(page);
+      setYtHasMore(hasMore);
     } catch (err) {
       console.error(err);
-      const errorMsg = err.response?.data?.error || err.message;
-      if (errorMsg.includes('API key') || errorMsg.includes('not configured')) {
-        toast.error('YouTube API key not configured. Please add YOUTUBE_API_KEY to backend .env file.');
-      } else {
-        toast.error('Could not search YouTube videos.');
-      }
-      setYoutubeVideos([]);
+      if (!append) toast.error('Could not load videos. Please try again.');
     } finally {
-      setLoadingYoutube(false);
+      if (append) setLoadingMore(false);
+      else        setLoadingYoutube(false);
     }
   }, [searchQuery, activeCategory]);
+
+  // Load next page
+  const loadMoreVideos = useCallback(() => {
+    if (loadingMore || loadingYoutube || !ytHasMore) return;
+    const q   = currentQueryRef.current.query;
+    const cat = currentQueryRef.current.category;
+    fetchYoutubeVideos(q, cat, ytPage + 1, true);
+  }, [loadingMore, loadingYoutube, ytHasMore, ytPage, fetchYoutubeVideos]);
+
+  // IntersectionObserver — fires when sentinel enters viewport
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0].isIntersecting) loadMoreVideos(); },
+      { rootMargin: '300px' }  // start loading 300px before visible
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [loadMoreVideos]);
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -446,6 +419,14 @@ export default function YogaMeditation() {
       const res = await client.get('yoga/stats/');
       setYogaStats(res.data.stats);
       setChallengeData(res.data.challenge);
+      
+      // Parse today's completed youtube_ids
+      const todayStr = new Date().toISOString().split('T')[0];
+      const completedToday = (res.data.logs || [])
+        .filter(log => log.completed_at === todayStr)
+        .map(log => log.video_details?.youtube_id)
+        .filter(Boolean);
+      setCompletedTodayIds(completedToday);
     } catch (err) {
       console.error(err);
     } finally {
@@ -456,14 +437,16 @@ export default function YogaMeditation() {
   useEffect(() => { fetchVideos(); }, [fetchVideos]);
   useEffect(() => { fetchStats(); }, [fetchStats]);
   
-  // Fetch YouTube videos when search query changes and source is YouTube
+  // Auto-search when category changes — reset to page 1
   useEffect(() => {
-    if (searchSource === 'youtube' && searchQuery.trim()) {
-      fetchYoutubeVideos();
-    } else if (searchSource === 'local') {
+    setYtPage(1);
+    if (activeCategory !== 'all') {
+      fetchYoutubeVideos('', activeCategory, 1, false);
+    } else if (!searchQuery.trim()) {
       setYoutubeVideos([]);
+      setYtHasMore(false);
     }
-  }, [searchQuery, searchSource, fetchYoutubeVideos]);
+  }, [activeCategory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Handlers ── */
   const handleBookmark = async (videoId) => {
@@ -484,6 +467,38 @@ export default function YogaMeditation() {
       fetchStats();
     } catch (err) {
       const msg = err.response?.data?.error || 'Failed to log session.';
+      toast.error(msg);
+    }
+  };
+
+  const handleYoutubeInteract = async (video, actionType) => {
+    try {
+      const res = await client.post('yoga/videos/youtube_interact/', {
+        youtube_id: video.youtube_id,
+        action: actionType,
+        title: video.title,
+        instructor: video.instructor,
+        thumbnail_url: video.thumbnail_url,
+        duration_mins: video.duration_mins,
+        category: video.category,
+        difficulty: video.difficulty,
+        calorie_burn: video.calorie_burn,
+        flexibility: video.flexibility,
+        relaxation: video.relaxation,
+        strength: video.strength,
+        video_source: video.video_source || 'youtube',
+      });
+      
+      if (actionType === 'bookmark') {
+        toast.success(res.data.status === 'bookmarked' ? '🔖 Bookmarked!' : 'Bookmark removed');
+      } else {
+        toast.success('🎉 Session logged! +20 XP earned!');
+      }
+      
+      fetchVideos();
+      fetchStats();
+    } catch (err) {
+      const msg = err.response?.data?.error || `Failed to ${actionType} video.`;
       toast.error(msg);
     }
   };
@@ -607,9 +622,6 @@ export default function YogaMeditation() {
         {/* ── Progress Stats ── */}
         {!loadingStats && <StatsRow stats={yogaStats} />}
 
-        {/* ── Challenge Tracker ── */}
-        {!loadingStats && <ChallengeTracker challenge={challengeData} stats={yogaStats} />}
-
         {/* ── Main Tabs ── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 28, overflowX: 'auto', paddingBottom: 4 }}>
           {[
@@ -630,75 +642,68 @@ export default function YogaMeditation() {
         {/* ══════════════ TAB: DISCOVER ══════════════ */}
         {activeTab === 'discover' && (
           <>
-            {/* Search + Filter */}
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flexGrow: 1, minWidth: 220 }}>
-                <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            {/* YouTube-style Search Bar */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 0,
+                background: 'var(--bg-card)',
+                border: '2px solid var(--border)',
+                borderRadius: '28px',
+                overflow: 'hidden',
+                transition: 'border-color 0.2s, box-shadow 0.2s',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+              }}
+                onFocusCapture={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(99,102,241,0.15)'; }}
+                onBlurCapture={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)'; }}
+              >
+                <Search size={18} style={{ flexShrink: 0, marginLeft: 20, color: 'var(--text-muted)' }} />
                 <input
                   type="text"
-                  placeholder={searchSource === 'youtube' ? 'Search YouTube for yoga & meditation videos…' : 'Search videos or instructors…'}
+                  placeholder="Search for yoga, meditation, wellness videos…"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && (searchSource === 'youtube' ? fetchYoutubeVideos() : fetchVideos())}
+                  onKeyDown={e => { if (e.key === 'Enter') { setYtPage(1); setActiveCategory('all'); fetchYoutubeVideos(undefined, 'all', 1, false); } }}
                   style={{
-                    width: '100%', padding: '10px 14px 10px 40px',
-                    borderRadius: '12px', border: '1px solid var(--border)',
-                    background: 'var(--bg-card)', color: 'var(--text-primary)',
-                    fontSize: '0.88rem',
+                    flex: 1, padding: '14px 16px',
+                    border: 'none', background: 'transparent',
+                    color: 'var(--text-primary)', fontSize: '1rem',
+                    outline: 'none',
                   }}
                 />
                 {searchQuery && (
                   <button
-                    onClick={() => { setSearchQuery(''); setYoutubeVideos([]); }}
-                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
-                  ><X size={14} /></button>
+                    onClick={() => { setSearchQuery(''); setYoutubeVideos([]); setActiveCategory('all'); setYtPage(1); setYtHasMore(false); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 12px', flexShrink: 0 }}
+                  ><X size={16} /></button>
                 )}
-              </div>
-              
-              {/* Search Source Toggle */}
-              <div style={{ display: 'flex', gap: 4, background: 'var(--bg-secondary)', padding: 4, borderRadius: 10, border: '1px solid var(--border)' }}>
                 <button
-                  onClick={() => { setSearchSource('local'); setYoutubeVideos([]); fetchVideos(); }}
+                  onClick={() => { setYtPage(1); setActiveCategory('all'); fetchYoutubeVideos(undefined, 'all', 1, false); }}
+                  disabled={!searchQuery.trim()}
                   style={{
-                    padding: '8px 14px', borderRadius: 8, border: 'none',
-                    background: searchSource === 'local' ? 'var(--primary)' : 'transparent',
-                    color: searchSource === 'local' ? '#fff' : 'var(--text-secondary)',
-                    fontWeight: '600', fontSize: '0.8rem', cursor: 'pointer',
-                    transition: 'all 0.2s',
+                    padding: '14px 24px', border: 'none', flexShrink: 0,
+                    background: searchQuery.trim() ? 'var(--primary)' : 'var(--bg-secondary)',
+                    color: searchQuery.trim() ? '#fff' : 'var(--text-muted)',
+                    fontWeight: '700', fontSize: '0.9rem', cursor: searchQuery.trim() ? 'pointer' : 'default',
+                    display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
                   }}
                 >
-                  📚 Library
-                </button>
-                <button
-                  onClick={() => { setSearchSource('youtube'); }}
-                  style={{
-                    padding: '8px 14px', borderRadius: 8, border: 'none',
-                    background: searchSource === 'youtube' ? '#ff0000' : 'transparent',
-                    color: searchSource === 'youtube' ? '#fff' : 'var(--text-secondary)',
-                    fontWeight: '600', fontSize: '0.8rem', cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  YouTube
+                  <Search size={16} /> Search
                 </button>
               </div>
-              
-              <button 
-                onClick={searchSource === 'youtube' ? fetchYoutubeVideos : fetchVideos} 
-                className="btn btn-secondary" 
-                style={{ padding: '10px 16px', display: 'flex', gap: 6, fontSize: '0.85rem' }}
-              >
-                <RefreshCw size={15} /> Search
-              </button>
             </div>
 
-            {/* Category chips */}
+            {/* Category chips — clicking auto-searches */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 28, overflowX: 'auto', paddingBottom: 4 }}>
               {CATEGORIES.map(cat => (
                 <button
                   key={cat.id}
                   className={`yoga-cat-btn ${activeCategory === cat.id ? 'active' : ''}`}
-                  onClick={() => setActiveCategory(cat.id)}
+                  onClick={() => {
+                    setActiveCategory(cat.id);
+                    if (cat.id !== 'all') {
+                      setSearchQuery('');
+                    }
+                  }}
                 >
                   <span>{cat.emoji}</span> {cat.label}
                 </button>
@@ -706,69 +711,106 @@ export default function YogaMeditation() {
             </div>
 
             {/* Videos grid */}
-            {loading ? (
+            {loadingYoutube ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
                   <Loader size={36} color="var(--primary)" style={{ animation: 'spin 1s linear infinite' }} />
-                  <p style={{ color: 'var(--text-muted)' }}>Loading yoga sessions…</p>
+                  <p style={{ color: 'var(--text-muted)' }}>Loading videos…</p>
                 </div>
               </div>
-            ) : searchSource === 'youtube' ? (
-              <>
-                {loadingYoutube ? (
-                  <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-                      <Loader size={36} color="#ff0000" style={{ animation: 'spin 1s linear infinite' }} />
-                      <p style={{ color: 'var(--text-muted)' }}>Searching YouTube…</p>
-                    </div>
-                  </div>
-                ) : youtubeVideos.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--text-muted)' }}>
-                    <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>🔍</div>
-                    <h3 style={{ fontSize: '1.1rem', marginBottom: 8 }}>No YouTube videos found</h3>
-                    <p>Try a different search term or switch to Library mode.</p>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(255,0,0,0.08)', border: '1px solid rgba(255,0,0,0.2)', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+            ) : searchQuery.trim() || activeCategory !== 'all' ? (
+              /* Search/category active state */
+              youtubeVideos.length > 0 ? (
+                <>
+                  <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: '1.2rem' }}>📺</span>
                       <div>
-                        <p style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                          {youtubeVideos.length} videos from YouTube
-                        </p>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          {youtubeVideos.length > 0 && youtubeVideos[0].is_from_youtube ? 
-                            'Results are fetched live from YouTube based on your search' : 
-                            'Showing curated yoga & meditation videos (add YouTube API key for live search)'}
+                        <h3 style={{ fontWeight: '800', fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                          Search Results
+                        </h3>
+                        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                          {youtubeVideos[0]?.is_from_youtube ? 'Live results from YouTube' :
+                           youtubeVideos[0]?.is_from_dailymotion ? 'Results from Dailymotion' :
+                           'Curated yoga & meditation videos'}
                         </p>
                       </div>
                     </div>
-                    <div className="yoga-videos-grid">
-                      {youtubeVideos.map((v, index) => (
-                        <VideoCard 
-                          key={`youtube-${index}`} 
-                          video={{...v, id: `youtube-${index}`, is_bookmarked: false, is_completed_today: false}} 
-                          onPlay={handlePlay} 
-                          onBookmark={() => toast.info('Bookmarking YouTube videos is not available yet')} 
-                          onComplete={() => toast.info('Completing YouTube videos is not available yet')} 
+                    <button
+                      onClick={() => { setYtPage(1); fetchYoutubeVideos(currentQueryRef.current.query, currentQueryRef.current.category, 1, false); }}
+                      style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <RefreshCw size={13} /> Refresh
+                    </button>
+                  </div>
+                  <div className="yoga-videos-grid">
+                    {youtubeVideos.map((v, index) => {
+                      const isBookmarked = bookmarked.some(b => b.youtube_id === v.youtube_id);
+                      const isCompleted = completedTodayIds.includes(v.youtube_id);
+                      return (
+                        <VideoCard
+                          key={`yt-${index}`}
+                          video={{ ...v, id: v.youtube_id, is_bookmarked: isBookmarked, is_completed_today: isCompleted }}
+                          onPlay={handlePlay}
+                          onBookmark={() => handleYoutubeInteract(v, 'bookmark')}
+                          onComplete={() => handleYoutubeInteract(v, 'complete')}
                         />
+                      );
+                    })}
+                  </div>
+
+                  {/* Sentinel div — IntersectionObserver watches this to trigger next page */}
+                  <div ref={sentinelRef} style={{ height: 1, marginTop: 8 }} />
+
+                  {/* Load more spinner */}
+                  {loadingMore && (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0', gap: 12, alignItems: 'center' }}>
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid var(--border)', borderTopColor: 'var(--primary)', animation: 'spin 0.8s linear infinite' }} />
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.88rem', fontWeight: '600' }}>Loading more videos…</span>
+                    </div>
+                  )}
+
+                  {/* End of results */}
+                  {!loadingMore && !ytHasMore && youtubeVideos.length > 0 && (
+                    <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                      <div style={{ width: 40, height: 1, background: 'var(--border)', display: 'inline-block', marginRight: 12, verticalAlign: 'middle' }} />
+                      You've reached the end
+                      <div style={{ width: 40, height: 1, background: 'var(--border)', display: 'inline-block', marginLeft: 12, verticalAlign: 'middle' }} />
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* No results state */
+                <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '3.5rem', marginBottom: 16 }}>🔍</div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: 8 }}>No videos found</h3>
+                  <p style={{ marginBottom: 20 }}>Try a different search term or browse a category below.</p>
+                  <button className="btn btn-secondary" onClick={() => { setSearchQuery(''); setYoutubeVideos([]); setActiveCategory('all'); }}>Clear Search</button>
+                </div>
+              )
+            ) : (
+              /* Idle state — show library or prompt to search */
+              <>
+                {videos.length > 0 ? (
+                  <>
+                    <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-primary)' }}>📚 Your Library</h3>
+                      <span style={{ fontSize: '0.75rem', background: 'var(--primary-light)', color: 'var(--primary)', padding: '2px 8px', borderRadius: 99, fontWeight: '700' }}>{videos.length} videos</span>
+                    </div>
+                    <div className="yoga-videos-grid">
+                      {videos.map(v => (
+                        <VideoCard key={v.id} video={v} onPlay={handlePlay} onBookmark={handleBookmark} onComplete={handleComplete} />
                       ))}
                     </div>
                   </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '3.5rem', marginBottom: 16 }}>🔍</div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: 8 }}>Search for videos</h3>
+                    <p style={{ fontSize: '0.88rem' }}>Type anything above — yoga, meditation, breathing, sleep…</p>
+                  </div>
                 )}
               </>
-            ) : videos.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--text-muted)' }}>
-                <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>🧘</div>
-                <h3 style={{ fontSize: '1.1rem', marginBottom: 8 }}>No videos found</h3>
-                <p>Try changing the category or search query.</p>
-              </div>
-            ) : (
-              <div className="yoga-videos-grid">
-                {videos.map(v => (
-                  <VideoCard key={v.id} video={v} onPlay={handlePlay} onBookmark={handleBookmark} onComplete={handleComplete} />
-                ))}
-              </div>
             )}
           </>
         )}
