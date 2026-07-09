@@ -1,0 +1,6 @@
+@echo off
+echo Starting Django backend on port 8000...
+start cmd /k ".venv\Scripts\python.exe backend/manage.py runserver"
+echo Starting Vite frontend...
+start cmd /k "npm --prefix frontend run dev"
+echo Both servers starting. You can access the app at http://localhost:5173.

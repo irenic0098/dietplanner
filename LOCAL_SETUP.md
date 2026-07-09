@@ -84,6 +84,33 @@ npm run dev
 
 Frontend will run at: `http://localhost:5173`
 
+## Running Frontend & Backend Concurrently (Recommended)
+
+To run both the Django backend and the Vite frontend simultaneously with a single command, you can use one of the following methods from the project root directory:
+
+### Method 1: Native Windows Script (Double-click or terminal)
+Double-click `run-dev.bat` or execute it in Cmd/PowerShell:
+```bash
+./run-dev.bat
+```
+*This will open two separate command prompt windows: one running the Django backend, and the other running the Vite frontend.*
+
+### Method 2: Bash Shell Script (Git Bash/WSL/macOS/Linux)
+Execute `run-dev.sh` in a Bash terminal:
+```bash
+./run-dev.sh
+```
+
+### Method 3: Unified npm command (Runs in one terminal)
+First, install the root developer dependencies:
+```bash
+npm install
+```
+Then, start both servers concurrently:
+```bash
+npm run dev
+```
+
 ## Common Development Commands
 
 ### Backend

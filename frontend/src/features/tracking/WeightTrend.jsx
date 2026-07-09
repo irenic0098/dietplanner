@@ -5,6 +5,7 @@ import {
   TrendingDown, TrendingUp, Minus, Scale, Target, Trophy,
   PlusCircle, Trash2, RefreshCw, ChevronDown, ChevronUp,
   Calendar, Award, Activity, Ruler, StickyNote, BarChart2,
+  Download, FileText, Sparkles, Percent
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -44,6 +45,7 @@ const filterByPeriod = (logs, period) => {
   if (period === 'weekly') cutoff.setDate(cutoff.getDate() - 7);
   else if (period === 'monthly') cutoff.setDate(cutoff.getDate() - 30);
   else if (period === '3m') cutoff.setDate(cutoff.getDate() - 90);
+  else if (period === '1y') cutoff.setDate(cutoff.getDate() - 365);
   else return logs; // all
   return logs.filter(l => new Date(l.date) >= cutoff);
 };
@@ -53,6 +55,7 @@ export default function WeightTrend() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('monthly');
   const [activeSection, setActiveSection] = useState('chart');
+  const [chartType, setChartType] = useState('weight'); // 'weight' or 'bmi'
 
   // Weight entry
   const [newWeight, setNewWeight] = useState('');
@@ -156,6 +159,113 @@ export default function WeightTrend() {
     } catch { toast.error('Failed to save measurements.'); }
   };
 
+  // ── Export Functions ──────────────────────────────────────
+  const exportCSV = () => {
+    if (!data?.table?.length) return toast.error('No weight data to export.');
+    const headers = ['Date', 'Weight (kg)', 'Change from Previous (kg)', 'BMI'];
+    const rows = (data.table || []).map(row => {
+      const rowBmi = data.stats?.height ? (row.weight / ((data.stats.height / 100) ** 2)).toFixed(1) : '—';
+      return `"${fmtDate(row.date)}",${row.weight},${row.change != null ? row.change : 0},${rowBmi}`;
+    });
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `weight_history_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('CSV Download started! 📥');
+  };
+
+  const exportPDF = () => {
+    if (!data?.table?.length) return toast.error('No weight data to export.');
+    const printWindow = window.open('', '_blank');
+    const tableRowsHtml = (data.table || []).map(row => {
+      const rowBmi = data.stats?.height ? (row.weight / ((data.stats.height / 100) ** 2)).toFixed(1) : '—';
+      const changeClass = row.change < 0 ? 'text-success' : row.change > 0 ? 'text-danger' : 'text-muted';
+      const changeSign = row.change > 0 ? '+' : '';
+      return `
+        <tr>
+          <td>${fmtDate(row.date)}</td>
+          <td><strong>${row.weight} kg</strong></td>
+          <td class="${changeClass}">${row.change != null ? `${changeSign}${row.change} kg` : '—'}</td>
+          <td>${rowBmi}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const htmlContent = `
+      <html>
+      <head>
+        <title>Weight History Report - DietPlanner</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
+          .header { display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 30px; }
+          h1 { color: #4f46e5; margin: 0; font-size: 1.75rem; font-weight: 800; }
+          .date { color: #64748b; font-size: 0.88rem; margin-top: 4px; }
+          .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 35px; }
+          .summary-card { padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; }
+          .summary-card label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; display: block; }
+          .summary-card span { font-size: 1.3rem; font-weight: 800; color: #0f172a; display: block; margin-top: 6px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 0.9rem; }
+          th { background-color: #f1f5f9; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
+          .text-success { color: #10b981; font-weight: 700; }
+          .text-danger { color: #ef4444; font-weight: 700; }
+          .text-muted { color: #94a3b8; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1>⚖️ DietPlanner Weight Report</h1>
+            <div class="date">Generated on ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+          </div>
+        </div>
+        
+        <div class="summary-grid">
+          <div class="summary-card">
+            <label>Starting Weight</label>
+            <span>${data.stats?.starting_weight} kg</span>
+          </div>
+          <div class="summary-card">
+            <label>Current Weight</label>
+            <span>${data.stats?.current_weight} kg</span>
+          </div>
+          <div class="summary-card">
+            <label>Goal Weight</label>
+            <span>${data.stats?.goal_weight ? `${data.stats.goal_weight} kg` : '—'}</span>
+          </div>
+          <div class="summary-card">
+            <label>Total Progress</label>
+            <span class="${data.stats?.weight_change <= 0 ? 'text-success' : 'text-danger'}">
+              ${data.stats?.weight_change > 0 ? '+' : ''}${data.stats?.weight_change} kg
+            </span>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Weight</th>
+              <th>Change</th>
+              <th>BMI</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   // ── Chart data ────────────────────────────────────────────
   const filtered = filterByPeriod(data?.logs?.map((l, i) => ({ ...l, id: i })), period);
   const chartLabels = filtered.map(l => fmtDate(l.date));
@@ -170,9 +280,12 @@ export default function WeightTrend() {
     predWeights.push(pred.in_1_month);
   }
 
+  const heightM = data?.stats?.height ? data.stats.height / 100 : null;
+  const isWeightChart = chartType === 'weight';
+
   const chartData = {
     labels: predLabels,
-    datasets: [
+    datasets: isWeightChart ? [
       {
         label: 'Weight (kg)',
         data: predWeights,
@@ -187,6 +300,48 @@ export default function WeightTrend() {
         pointBorderColor: '#fff',
         pointBorderWidth: 2,
       },
+      data?.stats?.goal_weight ? {
+        label: 'Goal Weight (kg)',
+        data: predLabels.map(() => data.stats.goal_weight),
+        borderColor: '#10b981',
+        borderDash: [5, 5],
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+      } : null
+    ].filter(Boolean) : [
+      {
+        label: 'BMI',
+        data: heightM ? predWeights.map(w => Math.round((w / (heightM ** 2)) * 10) / 10) : [],
+        borderColor: '#ec4899',
+        backgroundColor: 'rgba(236,72,153,0.08)',
+        borderWidth: 3,
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: '#ec4899',
+        pointRadius: (ctx) => ctx.dataIndex < chartWeights.length ? 5 : 8,
+        pointStyle: (ctx) => ctx.dataIndex < chartWeights.length ? 'circle' : 'star',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+      },
+      {
+        label: 'Healthy Max (25)',
+        data: predLabels.map(() => 25.0),
+        borderColor: 'rgba(16, 185, 129, 0.4)',
+        borderDash: [4, 4],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+      },
+      {
+        label: 'Healthy Min (18.5)',
+        data: predLabels.map(() => 18.5),
+        borderColor: 'rgba(245, 158, 11, 0.4)',
+        borderDash: [4, 4],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+      }
     ],
   };
 
@@ -194,16 +349,19 @@ export default function WeightTrend() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { display: false },
+      legend: { display: isWeightChart ? false : true, labels: { color: '#94a3b8' } },
       tooltip: {
         callbacks: {
-          label: (ctx) => ` ${ctx.raw} kg${ctx.dataIndex === predLabels.length - 1 && pred?.in_1_month ? ' (predicted)' : ''}`,
+          label: (ctx) => {
+            const isPredicted = ctx.dataIndex === predLabels.length - 1 && pred?.in_1_month;
+            return ` ${ctx.raw} ${isWeightChart ? 'kg' : ''}${isPredicted ? ' (predicted)' : ''}`;
+          },
         },
       },
     },
     scales: {
       x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', maxTicksLimit: 8 } },
-      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', callback: v => `${v} kg` } },
+      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', callback: v => isWeightChart ? `${v} kg` : v } },
     },
   };
 
@@ -212,6 +370,58 @@ export default function WeightTrend() {
   const bmiInfo = bmiCategory(bmi);
   const progressPct = stats?.progress_pct;
   const scoreColor = stats?.weight_change <= 0 ? '#10b981' : '#ef4444';
+
+  // ── Secondary Stats & Estimates ────────────────────────────
+  const remainingWeight = stats?.goal_weight ? Math.abs(stats.current_weight - stats.goal_weight) : null;
+  const isLossGoal = stats?.starting_weight > stats?.goal_weight;
+
+  let estimatedWeeksText = "";
+  if (remainingWeight === 0) {
+    estimatedWeeksText = "🎉 Goal reached!";
+  } else if (stats?.avg_weekly_change != null && stats.avg_weekly_change !== 0) {
+    const weeklyRate = stats.avg_weekly_change;
+    const isMovingTowardsGoal = (isLossGoal && weeklyRate < 0) || (!isLossGoal && weeklyRate > 0);
+    if (isMovingTowardsGoal) {
+      const weeks = Math.ceil(remainingWeight / Math.abs(weeklyRate));
+      estimatedWeeksText = `⏱️ Est. time to reach goal: ${weeks} weeks (at ${Math.abs(weeklyRate).toFixed(2)} kg/weekly)`;
+    } else {
+      estimatedWeeksText = "⚠️ Move trend towards goal to estimate arrival.";
+    }
+  } else if (stats?.goal_weight) {
+    estimatedWeeksText = "⏱️ Log more weekly entries to estimate timeline.";
+  } else {
+    estimatedWeeksText = "🎯 Set a goal weight to estimate time.";
+  }
+
+  const generateInsights = () => {
+    const list = [];
+    if (stats?.weight_change != null) {
+      if (stats.weight_change < 0) {
+        list.push(`🎉 You lost ${Math.abs(stats.weight_change)} kg total since starting.`);
+      } else if (stats.weight_change > 0) {
+        list.push(`📈 You gained ${stats.weight_change} kg total since starting.`);
+      }
+    }
+    if (data?.summary_30d?.change != null && data.summary_30d.change !== 0) {
+      if (data.summary_30d.change < 0) {
+        list.push(`📉 You lost ${Math.abs(data.summary_30d.change)} kg this month.`);
+      } else {
+        list.push(`📈 You gained ${data.summary_30d.change} kg this month.`);
+      }
+    }
+    if (stats?.avg_weekly_change != null && stats.avg_weekly_change !== 0) {
+      list.push(`Your average weekly change is ${stats.avg_weekly_change} kg.`);
+    }
+    if (stats?.goal_weight) {
+      const weeklyRate = stats.avg_weekly_change || 0;
+      const isMoving = (isLossGoal && weeklyRate < 0) || (!isLossGoal && weeklyRate > 0);
+      if (isMoving) {
+        list.push("🏆 You're on track to reach your goal!");
+      }
+    }
+    if (!list.length) list.push("⚖️ Consistent logging builds better weight insights!");
+    return list;
+  };
 
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', flexDirection: 'column', gap: 16 }}>
@@ -250,13 +460,19 @@ export default function WeightTrend() {
       `}</style>
 
       {/* ── Header ── */}
-      <div className="header-bar">
+      <div className="header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 14 }}>
         <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>⚖️ Weight Trend History</h2>
-          <p style={{ color: 'var(--text-secondary)' }}>Track your progress, predict your path, celebrate every milestone.</p>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0 }}>⚖️ Weight Trend History</h2>
+          <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Track your progress, predict your path, celebrate every milestone.</p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-secondary" onClick={fetchData} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={exportCSV} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 10 }}>
+            <Download size={15} /> Export CSV
+          </button>
+          <button className="btn btn-secondary" onClick={exportPDF} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 10 }}>
+            <FileText size={15} /> Export PDF
+          </button>
+          <button className="btn btn-secondary" onClick={fetchData} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 10 }}>
             <RefreshCw size={15} /> Refresh
           </button>
         </div>
@@ -276,23 +492,24 @@ export default function WeightTrend() {
         </div>
       ) : (
         <>
-          {/* ── Statistics Cards ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14, marginBottom: 28 }}>
+          {/* ── Statistics Cards (Progress Summary) ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
             {[
               { label: 'Current Weight', val: `${stats?.current_weight} kg`, color: '#6366f1', emoji: '⚖️' },
               { label: 'Starting Weight', val: `${stats?.starting_weight} kg`, color: '#94a3b8', emoji: '🏁' },
               { label: 'Goal Weight', val: stats?.goal_weight ? `${stats.goal_weight} kg` : 'Not set', color: '#10b981', emoji: '🎯' },
               {
-                label: 'Change',
+                label: 'Total Change',
                 val: `${stats?.weight_change > 0 ? '+' : ''}${stats?.weight_change} kg`,
                 color: scoreColor, emoji: stats?.weight_change <= 0 ? '📉' : '📈'
               },
-              { label: 'BMI', val: bmi ?? '—', color: bmiInfo.color, emoji: '💚', sub: bmiInfo.label },
               {
-                label: 'Avg Weekly',
-                val: stats?.avg_weekly_change != null ? `${stats.avg_weekly_change > 0 ? '+' : ''}${stats.avg_weekly_change} kg` : '—',
-                color: stats?.avg_weekly_change < 0 ? '#10b981' : '#f59e0b', emoji: '📊'
+                label: 'Remaining to Goal',
+                val: remainingWeight != null ? `${remainingWeight.toFixed(1)} kg` : '—',
+                color: '#6366f1', emoji: '🏁',
+                sub: stats?.current_weight > stats?.goal_weight ? 'To Lose' : (stats?.current_weight < stats?.goal_weight ? 'To Gain' : '')
               },
+              { label: 'BMI', val: bmi ?? '—', color: bmiInfo.color, emoji: '💚', sub: bmiInfo.label },
             ].map(({ label, val, color, emoji, sub }) => (
               <div key={label} className="stat-card">
                 <div style={{ fontSize: '1.6rem' }}>{emoji}</div>
@@ -303,30 +520,151 @@ export default function WeightTrend() {
             ))}
           </div>
 
-          {/* ── Progress Bar ── */}
-          {progressPct != null && (
-            <div className="wt-section" style={{ marginBottom: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ fontWeight: 800, fontSize: '1rem' }}>
-                  🎯 Goal Progress
+          {/* ── Goal Progress & BMI Gauge ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, marginBottom: 24 }}>
+            {/* Goal Progress Panel */}
+            <div className="wt-section" style={{ margin: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Percent size={18} color="var(--primary)" /> Goal Progress
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#10b981' }}>{progressPct != null ? `${progressPct}%` : '—'}</div>
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#10b981' }}>{progressPct}%</div>
+                {progressPct != null ? (
+                  <div style={{ background: 'var(--border)', borderRadius: 99, height: 12, overflow: 'hidden', position: 'relative', marginBottom: 10 }}>
+                    <div style={{
+                      width: `${progressPct}%`, height: '100%', borderRadius: 99,
+                      background: 'linear-gradient(90deg, #6366f1, #10b981)',
+                      transition: 'width 1s cubic-bezier(0.4,0,0.2,1)',
+                      boxShadow: '0 0 10px rgba(99,102,241,0.3)',
+                    }} />
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '10px 0' }}>Define a target weight to enable progress indicators.</p>
+                )}
               </div>
-              <div style={{ background: 'var(--border)', borderRadius: 99, height: 14, overflow: 'hidden', position: 'relative' }}>
-                <div style={{
-                  width: `${progressPct}%`, height: '100%', borderRadius: 99,
-                  background: 'linear-gradient(90deg, #6366f1, #10b981)',
-                  transition: 'width 1s cubic-bezier(0.4,0,0.2,1)',
-                  boxShadow: '0 0 12px rgba(99,102,241,0.4)',
-                }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                <span>Started: {stats.starting_weight} kg</span>
-                <span>Current: {stats.current_weight} kg</span>
-                <span>Goal: {stats.goal_weight} kg</span>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600, borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
+                {estimatedWeeksText}
               </div>
             </div>
-          )}
+
+            {/* BMI Trend Gauge */}
+            <div className="wt-section" style={{ margin: 0 }}>
+              <h4 style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: 10, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                💚 BMI Trend Gauge
+              </h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <span style={{ fontSize: '1.6rem', fontWeight: 900, color: bmiInfo.color }}>{bmi || '—'}</span>
+                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: bmiInfo.color, background: `${bmiInfo.color}15`, padding: '4px 10px', borderRadius: 6 }}>
+                  {bmiInfo.label}
+                </span>
+              </div>
+              <div style={{ position: 'relative', height: 8, background: 'linear-gradient(90deg, #f59e0b 0%, #10b981 35%, #f59e0b 70%, #ef4444 100%)', borderRadius: 99, marginTop: 14 }}>
+                {bmi && (
+                  <div style={{
+                    position: 'absolute',
+                    left: `${Math.min(100, Math.max(0, ((bmi - 15) / 20) * 100))}%`,
+                    top: -6,
+                    width: 20,
+                    height: 20,
+                    borderRadius: '50%',
+                    background: '#fff',
+                    border: `4px solid ${bmiInfo.color}`,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                    transform: 'translateX(-50%)',
+                    transition: 'left 0.5s'
+                  }} />
+                )}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 8, fontWeight: 600 }}>
+                <span>15.0 (Under)</span>
+                <span>18.5 (Healthy)</span>
+                <span>25.0 (Over)</span>
+                <span>30.0+ (Obese)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Weekly & Monthly Summaries ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
+            {/* 7-Day Summary */}
+            <div className="wt-section" style={{ margin: 0, padding: 20 }}>
+              <h4 style={{ fontWeight: 800, fontSize: '0.92rem', marginBottom: 14, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                📅 7-Day Weekly Summary
+              </h4>
+              {data?.summary_7d && Object.keys(data.summary_7d).length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Average Weight</span>
+                    <strong style={{ fontSize: '1.05rem' }}>{data.summary_7d.avg} kg</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Weight Change</span>
+                    <strong style={{ fontSize: '1.05rem', color: data.summary_7d.change < 0 ? '#10b981' : data.summary_7d.change > 0 ? '#ef4444' : '#94a3b8' }}>
+                      {data.summary_7d.change > 0 ? '+' : ''}{data.summary_7d.change} kg
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Highest Weight</span>
+                    <strong style={{ fontSize: '1.05rem' }}>{data.summary_7d.highest} kg</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Lowest Weight</span>
+                    <strong style={{ fontSize: '1.05rem' }}>{data.summary_7d.lowest} kg</strong>
+                  </div>
+                </div>
+              ) : (
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>No entries logged in the last 7 days.</p>
+              )}
+            </div>
+
+            {/* 30-Day Summary */}
+            <div className="wt-section" style={{ margin: 0, padding: 20 }}>
+              <h4 style={{ fontWeight: 800, fontSize: '0.92rem', marginBottom: 14, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                📅 30-Day Monthly Summary
+              </h4>
+              {data?.summary_30d && Object.keys(data.summary_30d).length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Average Weight</span>
+                    <strong style={{ fontSize: '1.05rem' }}>{data.summary_30d.avg} kg</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Weight Change</span>
+                    <strong style={{ fontSize: '1.05rem', color: data.summary_30d.change < 0 ? '#10b981' : data.summary_30d.change > 0 ? '#ef4444' : '#94a3b8' }}>
+                      {data.summary_30d.change > 0 ? '+' : ''}{data.summary_30d.change} kg
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Highest Weight</span>
+                    <strong style={{ fontSize: '1.05rem' }}>{data.summary_30d.highest} kg</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Lowest Weight</span>
+                    <strong style={{ fontSize: '1.05rem' }}>{data.summary_30d.lowest} kg</strong>
+                  </div>
+                </div>
+              ) : (
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>No entries logged in the last 30 days.</p>
+              )}
+            </div>
+          </div>
+
+          {/* ── Weight Insights Panel ── */}
+          <div className="wt-section" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(16,185,129,0.04))', border: '1px solid rgba(99,102,241,0.15)' }}>
+            <h4 style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Sparkles size={16} color="#6366f1" /> Personal Weight Insights
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {generateInsights().map((insight, idx) => (
+                <div key={idx} style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366f1' }} />
+                  {insight}
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* ── Section Tabs ── */}
           <div style={{ display: 'flex', borderBottom: '2px solid var(--border)', marginBottom: 24, gap: 2, overflowX: 'auto', scrollbarWidth: 'none' }}>
@@ -351,11 +689,33 @@ export default function WeightTrend() {
             <div className="animate-fade-in">
               <div className="wt-section">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
-                  <h3 style={{ fontWeight: 800, fontSize: '1.1rem' }}>📈 Weight Progress Graph</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <h3 style={{ fontWeight: 800, fontSize: '1.1rem', margin: 0 }}>📈 Weight Progress Graph</h3>
+                    <div style={{ display: 'flex', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 8, padding: 3 }}>
+                      <button
+                        onClick={() => setChartType('weight')}
+                        style={{
+                          border: 'none', background: isWeightChart ? 'var(--primary)' : 'transparent',
+                          color: isWeightChart ? '#fff' : 'var(--text-secondary)', padding: '4px 10px', borderRadius: 6, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600
+                        }}
+                      >
+                        Weight
+                      </button>
+                      <button
+                        onClick={() => setChartType('bmi')}
+                        style={{
+                          border: 'none', background: !isWeightChart ? '#ec4899' : 'transparent',
+                          color: !isWeightChart ? '#fff' : 'var(--text-secondary)', padding: '4px 10px', borderRadius: 6, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600
+                        }}
+                      >
+                        BMI
+                      </button>
+                    </div>
+                  </div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    {['weekly', 'monthly', '3m', 'all'].map(p => (
+                    {['weekly', 'monthly', '3m', '1y', 'all'].map(p => (
                       <button key={p} className={`period-btn ${period === p ? 'active' : ''}`} onClick={() => setPeriod(p)}>
-                        {p === 'weekly' ? '7D' : p === 'monthly' ? '30D' : p === '3m' ? '3M' : 'All'}
+                        {p === 'weekly' ? '7D' : p === 'monthly' ? '30D' : p === '3m' ? '3M' : p === '1y' ? '1Y' : 'All'}
                       </button>
                     ))}
                   </div>
@@ -370,7 +730,7 @@ export default function WeightTrend() {
                     </div>
                   )}
                 </div>
-                {pred?.trend && (
+                {pred?.trend && isWeightChart && (
                   <div style={{ marginTop: 16, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.8rem', background: 'var(--primary-light)', color: 'var(--primary)', padding: '4px 14px', borderRadius: 99, fontWeight: 700 }}>
                       Trend: {pred.trend === 'losing' ? '📉 Losing' : pred.trend === 'gaining' ? '📈 Gaining' : '➡️ Stable'} ({pred.kg_per_week > 0 ? '+' : ''}{pred.kg_per_week} kg/week)
@@ -392,30 +752,34 @@ export default function WeightTrend() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                      {['Date', 'Weight', 'Change', 'Action'].map(h => (
+                      {['Date', 'Weight', 'Change', 'BMI', 'Action'].map(h => (
                         <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.06em' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {(table || []).map((row, i) => (
-                      <tr key={row.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                        <td style={{ padding: '12px 14px', fontWeight: 600 }}>{fmtDate(row.date)}</td>
-                        <td style={{ padding: '12px 14px', fontWeight: 800, fontSize: '1rem' }}>{row.weight} kg</td>
-                        <td style={{ padding: '12px 14px' }}>
-                          {row.change != null ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700, color: row.change < 0 ? '#10b981' : row.change > 0 ? '#ef4444' : '#94a3b8' }}>
-                              {trendIcon(row.change)} {row.change > 0 ? '+' : ''}{row.change} kg
-                            </span>
-                          ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                        </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          <button onClick={() => handleDeleteWeight(row.id)} style={{ background: 'none', border: '1px solid var(--danger)', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', color: 'var(--danger)' }}>
-                            <Trash2 size={13} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {(table || []).map((row, i) => {
+                      const rowBmi = stats?.height ? (row.weight / ((stats.height / 100) ** 2)).toFixed(1) : '—';
+                      return (
+                        <tr key={row.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
+                          <td style={{ padding: '12px 14px', fontWeight: 600 }}>{fmtDate(row.date)}</td>
+                          <td style={{ padding: '12px 14px', fontWeight: 800, fontSize: '1rem' }}>{row.weight} kg</td>
+                          <td style={{ padding: '12px 14px' }}>
+                            {row.change != null ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700, color: row.change < 0 ? '#10b981' : row.change > 0 ? '#ef4444' : '#94a3b8' }}>
+                                {trendIcon(row.change)} {row.change > 0 ? '+' : ''}{row.change} kg
+                              </span>
+                            ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          </td>
+                          <td style={{ padding: '12px 14px', fontWeight: 700, color: bmiCategory(parseFloat(rowBmi)).color }}>{rowBmi}</td>
+                          <td style={{ padding: '12px 14px' }}>
+                            <button onClick={() => handleDeleteWeight(row.id)} style={{ background: 'none', border: '1px solid var(--danger)', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', color: 'var(--danger)' }}>
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
                 {(!table || table.length === 0) && (
@@ -563,8 +927,8 @@ export default function WeightTrend() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {(notes || []).map(n => (
                       <div key={n.id} style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--bg-primary)', border: '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                          <div>
+                        <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                          <div style={{ flex: 1 }}>
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: 4 }}>📅 {fmtDate(n.date)}</div>
                             <div style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>{n.note}</div>
                           </div>

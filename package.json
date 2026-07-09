@@ -1,0 +1,13 @@
+{
+  "name": "dietplanner-root",
+  "version": "1.0.0",
+  "description": "Root controller for DietPlanner development",
+  "scripts": {
+    "dev:backend": ".venv\\Scripts\\python.exe backend/manage.py runserver",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

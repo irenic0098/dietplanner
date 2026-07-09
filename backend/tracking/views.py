@@ -404,6 +404,29 @@ class WeightStatsView(viewsets.ViewSet):
                 'trend': 'losing' if slope < -0.01 else ('gaining' if slope > 0.01 else 'stable'),
             }
 
+        # ── Weekly & Monthly Summary ──
+        summary_7d = {}
+        recent_7 = [l for l in logs if l.logged_at >= (date.today() - timedelta(days=7))]
+        if recent_7:
+            weights_7 = [r.weight for r in recent_7]
+            summary_7d = {
+                'avg': round(sum(weights_7) / len(weights_7), 2),
+                'change': round(weights_7[-1] - weights_7[0], 2) if len(weights_7) >= 2 else 0.0,
+                'highest': max(weights_7),
+                'lowest': min(weights_7),
+            }
+
+        summary_30d = {}
+        recent_30 = [l for l in logs if l.logged_at >= (date.today() - timedelta(days=30))]
+        if recent_30:
+            weights_30 = [r.weight for r in recent_30]
+            summary_30d = {
+                'avg': round(sum(weights_30) / len(weights_30), 2),
+                'change': round(weights_30[-1] - weights_30[0], 2) if len(weights_30) >= 2 else 0.0,
+                'highest': max(weights_30),
+                'lowest': min(weights_30),
+            }
+
         # ── Table with change column ──
         table = []
         for i, log in enumerate(reversed(logs)):
@@ -432,10 +455,13 @@ class WeightStatsView(viewsets.ViewSet):
                 'goal_weight': goal_weight,
                 'weight_change': weight_change,
                 'bmi': bmi,
+                'height': profile.height if (profile and profile.height) else None,
                 'avg_weekly_change': avg_weekly,
                 'progress_pct': progress_pct,
                 'total_entries': len(logs),
             },
+            'summary_7d': summary_7d,
+            'summary_30d': summary_30d,
             'milestones': milestones,
             'badges': badges,
             'prediction': prediction,
