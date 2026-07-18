@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Check, Trophy } from 'lucide-react';
+import { Bell, Check, Trophy, Menu } from 'lucide-react';
 import client from '../api/client';
 import { useAuthStore } from '../store/authStore';
 
@@ -44,10 +44,30 @@ export default function Navbar({ onToggleMenu }) {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <header className="glass" style={{ padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 'var(--radius-sm)', marginBottom: '30px', position: 'relative' }}>
-      <div>
-        <h1 style={{ fontSize: '1.25rem', fontWeight: '700' }}>Welcome back!</h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Track your nutrition, hit your targets, and achieve milestones today.</p>
+    <header className="navbar-header glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 'var(--radius-sm)', marginBottom: '30px', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        {onToggleMenu && (
+          <button 
+            className="mobile-menu-btn" 
+            onClick={onToggleMenu}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '50%',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Menu size={22} />
+          </button>
+        )}
+        <div>
+          <h1 style={{ fontSize: '1.2rem', fontWeight: '700' }}>Welcome back!</h1>
+          <p className="navbar-sub" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Track your nutrition, hit targets, and achieve milestones today.</p>
+        </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
@@ -76,7 +96,7 @@ export default function Navbar({ onToggleMenu }) {
           </button>
 
           {showDropdown && (
-            <div className="glass animate-fade-in" style={{ position: 'absolute', top: '100%', right: 0, width: '320px', borderRadius: 'var(--radius-sm)', padding: '16px', zIndex: 1000, marginTop: '8px', boxShadow: 'var(--shadow-lg)' }}>
+            <div className="navbar-notifications-dropdown glass animate-fade-in" style={{ position: 'absolute', top: '100%', right: 0, borderRadius: 'var(--radius-sm)', padding: '16px', zIndex: 1000, marginTop: '8px', boxShadow: 'var(--shadow-lg)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h4 style={{ fontWeight: '700', fontSize: '0.9rem' }}>Notifications</h4>
                 {unreadCount > 0 && (

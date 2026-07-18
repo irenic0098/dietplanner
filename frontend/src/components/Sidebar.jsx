@@ -22,7 +22,7 @@ import {
   Flower,
 } from 'lucide-react';
 
-export default function Sidebar({ onClose }) {
+export default function Sidebar({ onClose, className }) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
@@ -74,31 +74,52 @@ export default function Sidebar({ onClose }) {
   const avatarLetter = user?.username?.[0]?.toUpperCase() || 'U';
 
   return (
-    <aside className="sidebar glass">
+    <aside className={`sidebar glass ${className || ''}`}>
 
       {/* ── Brand / Logo ── */}
-      <div className="sidebar-brand">
-        <div style={{
-          background: 'var(--primary)',
-          color: 'white',
-          borderRadius: '10px',
-          fontWeight: '800',
-          fontSize: '1rem',
-          flexShrink: 0,
-          width: '40px',
-          height: '40px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          NP
+      <div className="sidebar-brand" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            background: 'var(--primary)',
+            color: 'white',
+            borderRadius: '10px',
+            fontWeight: '800',
+            fontSize: '1rem',
+            flexShrink: 0,
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            NP
+          </div>
+          <div className="sidebar-label" style={{ overflow: 'hidden' }}>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: '800', letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
+              NUTRIPLATE
+            </h2>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Nutrition Ecosystem</span>
+          </div>
         </div>
-        <div className="sidebar-label" style={{ overflow: 'hidden' }}>
-          <h2 style={{ fontSize: '1.05rem', fontWeight: '800', letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
-            NUTRIPLATE
-          </h2>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Nutrition Ecosystem</span>
-        </div>
+
+        {onClose && (
+          <button 
+            className="sidebar-close-btn" 
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              padding: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <X size={20} />
+          </button>
+        )}
       </div>
 
       {/* ── Navigation Links ── */}
