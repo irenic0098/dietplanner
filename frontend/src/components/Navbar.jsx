@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Check, Trophy, Menu } from 'lucide-react';
+import { Bell, Check, Trophy } from 'lucide-react';
 import client from '../api/client';
 import { useAuthStore } from '../store/authStore';
+import UserAvatar from './UserAvatar';
 
-export default function Navbar({ onToggleMenu }) {
-  const { profile } = useAuthStore();
+export default function Navbar({ onOpenSidebar, sidebarOpen = false }) {
+  const { user, profile } = useAuthStore();
   const [notifications, setNotifications] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -46,22 +47,16 @@ export default function Navbar({ onToggleMenu }) {
   return (
     <header className="navbar-header glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 'var(--radius-sm)', marginBottom: '30px', position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        {onToggleMenu && (
-          <button 
-            className="mobile-menu-btn" 
-            onClick={onToggleMenu}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-              padding: '8px',
-              borderRadius: '50%',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+        {onOpenSidebar && (
+          <button
+            type="button"
+            className={`navbar-profile-btn${sidebarOpen ? ' is-active' : ''}`}
+            onClick={onOpenSidebar}
+            aria-label="Open navigation menu"
+            aria-expanded={sidebarOpen}
+            aria-controls="app-sidebar"
           >
-            <Menu size={22} />
+            <UserAvatar user={user} profile={profile} size={38} />
           </button>
         )}
         <div>
@@ -73,7 +68,7 @@ export default function Navbar({ onToggleMenu }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
         {/* Streak & XP Display */}
         {profile && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'var(--bg-primary)', padding: '6px 16px', borderRadius: '9999px', fontSize: '0.9rem' }}>
+          <div className="navbar-stats" style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'var(--bg-primary)', padding: '6px 16px', borderRadius: '9999px', fontSize: '0.9rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--warning)', fontWeight: 'bold' }}>
               🔥 {profile.streak} Days
             </div>

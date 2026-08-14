@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import UserAvatar from './UserAvatar';
 import { 
   LayoutDashboard, 
   Utensils, 
@@ -22,8 +23,8 @@ import {
   Flower,
 } from 'lucide-react';
 
-export default function Sidebar({ onClose, className }) {
-  const { user, logout } = useAuthStore();
+export default function Sidebar({ onClose, className = '', drawerOpen = false }) {
+  const { user, profile, logout } = useAuthStore();
   const navigate = useNavigate();
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
 
@@ -71,10 +72,21 @@ export default function Sidebar({ onClose, className }) {
     ...(user?.role === 'admin' ? adminLinks : []),
   ];
 
-  const avatarLetter = user?.username?.[0]?.toUpperCase() || 'U';
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const handleChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', handleChange);
+    return () => mq.removeEventListener('change', handleChange);
+  }, []);
 
   return (
-    <aside className={`sidebar glass ${className || ''}`}>
+    <aside
+      id="app-sidebar"
+      className={`sidebar glass ${className}`.trim()}
+      aria-hidden={isMobile && !drawerOpen ? 'true' : undefined}
+    >
 
       {/* ── Brand / Logo ── */}
       <div className="sidebar-brand" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -130,7 +142,7 @@ export default function Sidebar({ onClose, className }) {
             <NavLink
               key={link.to}
               to={link.to}
-              onClick={onClose}
+              onClick={() => onClose?.()}
               className={({ isActive }) =>
                 `sidebar-nav-link ${isActive ? 'active' : ''}`
               }
@@ -148,21 +160,7 @@ export default function Sidebar({ onClose, className }) {
       <div className="sidebar-footer">
         {/* Avatar + Username */}
         <div className="sidebar-profile-row">
-          <div style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '50%',
-            background: 'var(--accent-light)',
-            color: 'var(--accent)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 'bold',
-            fontSize: '1rem',
-            flexShrink: 0,
-          }}>
-            {avatarLetter}
-          </div>
+          <UserAvatar user={user} profile={profile} size={40} />
           <div className="sidebar-label" style={{ overflow: 'hidden' }}>
             <p style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
               {user?.username}

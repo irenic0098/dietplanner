@@ -531,13 +531,113 @@ input:focus, select:focus, textarea:focus {
   color: var(--primary);
 }
 
+/* Profile avatar trigger — mobile navigation */
+.navbar-profile-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.navbar-profile-btn:hover {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 4px var(--primary-light);
+}
+
+.navbar-profile-btn:active {
+  transform: scale(0.96);
+}
+
+.navbar-profile-btn.is-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-light);
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1050;
+  animation: sidebarBackdropIn 0.25s ease;
+}
+
+@keyframes sidebarBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sidebar-close-btn {
+  display: none;
+  flex-shrink: 0;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.sidebar-close-btn:hover {
+  background: var(--primary-light);
+}
+
 @media (max-width: 768px) {
   .sidebar {
-    display: none !important; /* Hide sidebar entirely on phones */
+    display: flex !important;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(280px, 88vw);
+    height: 100vh;
+    height: 100dvh;
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1100;
+    box-shadow: none;
+  }
+
+  .sidebar:hover {
+    width: min(280px, 88vw);
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.18);
+  }
+
+  .sidebar.sidebar-open .sidebar-label {
+    opacity: 1;
+    max-width: 200px;
+  }
+
+  .sidebar-close-btn {
+    display: flex;
+  }
+
+  .navbar-profile-btn {
+    display: flex;
+  }
+
+  .navbar-sub {
+    display: none;
+  }
+
+  .navbar-header h1 {
+    font-size: 1.05rem !important;
+  }
+
+  .navbar-header .navbar-stats {
+    display: none;
   }
 
   .bottom-bar {
-    display: flex; /* Show bottom bar on phones */
+    display: flex;
     background: var(--bg-card);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -546,11 +646,13 @@ input:focus, select:focus, textarea:focus {
 
   .main-content {
     padding: 20px;
-    padding-bottom: 90px !important; /* Extra bottom padding for layout offset */
+    padding-bottom: 90px !important;
   }
+}
 
-  .menu-toggle-btn {
-    display: none !important; /* Hide hamburger toggle button on phones */
+@media (min-width: 769px) {
+  .sidebar-backdrop {
+    display: none;
   }
 }
 

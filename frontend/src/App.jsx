@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
@@ -20,11 +20,61 @@ import YogaMeditation from './features/yoga/YogaMeditation';
 import { Toaster } from 'react-hot-toast';
 
 function Layout({ children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') setSidebarOpen(false);
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768) setSidebarOpen(false);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="app-container">
-      <Sidebar onClose={() => {}} />
+      {sidebarOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+      )}
+      <Sidebar
+        className={sidebarOpen ? 'sidebar-open' : ''}
+        drawerOpen={sidebarOpen}
+        onClose={sidebarOpen ? closeSidebar : undefined}
+      />
       <main className="main-content">
-        <Navbar onToggleMenu={() => {}} />
+        <Navbar
+          sidebarOpen={sidebarOpen}
+          onOpenSidebar={() => setSidebarOpen(true)}
+        />
         {children}
       </main>
       <BottomBar />
