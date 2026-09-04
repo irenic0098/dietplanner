@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Mail, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
 import AuthLayout from './AuthLayout';
 
 export default function ForgotPassword() {
-  const navigate = useNavigate();
   const { requestPasswordReset, loading, error, clearAuthError } = useAuthStore();
   const [identity, setIdentity] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [devData, setDevData] = useState(null);
+  const [sentToEmail, setSentToEmail] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,20 +23,12 @@ export default function ForgotPassword() {
 
     if (result.success) {
       setIsSubmitted(true);
-      if (result.data?.reset_url) {
-        setDevData(result.data);
-      }
-      toast.success('Password reset instructions generated!');
+      setSentToEmail(result.data?.email || identity.trim());
+      toast.success('Password reset instructions sent to your email!');
       return;
     }
 
     toast.error(result.message || 'Unable to process request. Please try again.');
-  };
-
-  const handleResetDevNavigate = () => {
-    if (devData?.dev_uid && devData?.dev_token) {
-      navigate(`/reset-password/${devData.dev_uid}/${devData.dev_token}`);
-    }
   };
 
   return (
@@ -45,53 +36,38 @@ export default function ForgotPassword() {
       title={isSubmitted ? 'Check your email' : 'Forgot password?'}
       subtitle={
         isSubmitted
-          ? "We've sent password reset instructions to your registered address."
-          : 'Enter your username or email address and we will help you reset your password.'
+          ? "We've sent password reset instructions to your registered email address."
+          : 'Enter your username or email address and we will send you a reset link.'
       }
     >
       {error && !isSubmitted && <div className="auth-alert">{error}</div>}
 
       {isSubmitted ? (
-        <div className="auth-success-card">
+        <div className="auth-success-card animate-fade-in">
           <div className="auth-success-icon">
             <CheckCircle2 size={32} />
           </div>
 
           <h2 className="auth-success-title">Instructions Sent</h2>
           <p className="auth-success-desc">
-            If an account matches <strong>{identity}</strong>, an email with a secure link to reset your password is on its way.
+            An email with a secure link to reset your password has been sent to{' '}
+            <strong>{sentToEmail || identity}</strong>.
+          </p>
+          <p className="auth-success-desc" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', opacity: 0.85 }}>
+            Please check your Gmail inbox (and Spam or Promotions folders). Click the link in that email to set a new password.
           </p>
 
-          {devData?.reset_url && (
-            <div className="auth-dev-box animate-fade-in">
-              <div className="auth-dev-box-title">
-                <ExternalLink size={14} /> Local Dev Shortcut
-              </div>
-              <p>
-                In development mode, you can jump straight to the reset page without checking email logs:
-              </p>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ width: '100%', fontSize: '0.85rem', padding: '8px 12px' }}
-                onClick={handleResetDevNavigate}
-              >
-                Proceed to Reset Password &rarr;
-              </button>
-            </div>
-          )}
-
-          <div style={{ width: '100%', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ width: '100%', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-secondary"
               style={{ width: '100%' }}
               onClick={() => {
                 setIsSubmitted(false);
-                setDevData(null);
+                setIdentity('');
               }}
             >
-              Try another email or username
+              Send to another email or username
             </button>
             <Link to="/login" className="auth-back-link" style={{ justifyContent: 'center' }}>
               <ArrowLeft size={16} /> Back to Sign in

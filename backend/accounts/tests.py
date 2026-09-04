@@ -76,6 +76,8 @@ class AuthAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_password_reset_request_success(self):
+        from django.core import mail
+
         User.objects.create_user(
             username='resetuser',
             email='reset@example.com',
@@ -90,7 +92,16 @@ class AuthAPITestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('message', response.data)
-        self.assertIn('reset_url', response.data)
+        # Verify no token or reset_url is leaked in the response
+        self.assertNotIn('reset_url', response.data)
+        self.assertNotIn('dev_token', response.data)
+        self.assertNotIn('dev_uid', response.data)
+
+        # Verify email was generated and delivered to outbox
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['reset@example.com'])
+        self.assertIn('Reset your DietPlanner password', mail.outbox[0].subject)
+        self.assertIn('/reset-password/', mail.outbox[0].body)
 
     def test_password_reset_request_rejects_unknown_email(self):
         response = self.client.post(

@@ -248,16 +248,25 @@ REST_FRAMEWORK = {
 }
 
 # Email Configuration
-EMAIL_BACKEND = os.getenv(
-    'EMAIL_BACKEND',
-    'django.core.mail.backends.smtp.EmailBackend' if ENVIRONMENT == 'production' and os.getenv('EMAIL_HOST') else 'django.core.mail.backends.console.EmailBackend'
+# If EMAIL_BACKEND is set in .env, respect it.
+# Otherwise, if EMAIL_HOST_USER is provided, use SMTP backend so emails are sent via Gmail/SMTP.
+# Falls back to console backend only if no credentials are configured.
+_default_email_backend = (
+    'django.core.mail.backends.smtp.EmailBackend'
+    if os.getenv('EMAIL_HOST_USER') or ENVIRONMENT == 'production'
+    else 'django.core.mail.backends.console.EmailBackend'
 )
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', _default_email_backend)
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 'yes')
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'DietPlanner <noreply@dietplanner.local>')
+DEFAULT_FROM_EMAIL = os.getenv(
+    'DEFAULT_FROM_EMAIL',
+    f'DietPlanner <{EMAIL_HOST_USER}>' if EMAIL_HOST_USER else 'DietPlanner <noreply@dietplanner.local>'
+)
 
 # SimpleJWT configuration
 SIMPLE_JWT = {

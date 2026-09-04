@@ -49,35 +49,74 @@ class PasswordResetRequestView(APIView):
             f"You recently requested to reset the password for your DietPlanner account.\n\n"
             f"Please click the link below to set a new password:\n"
             f"{reset_url}\n\n"
+            f"This link will expire in 24 hours.\n\n"
             f"If you did not request a password reset, please ignore this email.\n\n"
             f"— The DietPlanner Team"
         )
+        html_message = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Reset your password</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 32px 16px; color: #f8fafc;">
+  <div style="max-width: 520px; margin: 0 auto; background: #1e293b; border-radius: 16px; padding: 32px; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+    <h2 style="margin-top: 0; color: #10b981; font-size: 22px; font-weight: 700;">DietPlanner</h2>
+    <h3 style="margin-top: 8px; color: #ffffff; font-size: 18px;">Password Reset Request</h3>
+    <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6;">Hello <strong>{user.username}</strong>,</p>
+    <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6;">
+      We received a request to reset your DietPlanner account password. Click the button below to choose a new password:
+    </p>
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="{reset_url}" style="background: #10b981; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+        Reset My Password
+      </a>
+    </div>
+    <p style="color: #94a3b8; font-size: 13px; line-height: 1.5;">
+      If the button above does not work, copy and paste this URL into your browser:
+      <br/>
+      <a href="{reset_url}" style="color: #38bdf8; word-break: break-all;">{reset_url}</a>
+    </p>
+    <hr style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 24px 0;" />
+    <p style="color: #64748b; font-size: 12px; margin-bottom: 0;">
+      This link is valid for 24 hours. If you did not request this password reset, please ignore this email.
+    </p>
+  </div>
+</body>
+</html>"""
 
         email_sent = False
+        send_error = None
         try:
             send_mail(
                 subject=subject,
                 message=message,
-                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@dietplanner.local'),
+                html_message=html_message,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
                 recipient_list=[user.email],
                 fail_silently=False,
             )
             email_sent = True
         except Exception as e:
-            logger.warning(f"Could not send password reset email to {user.email}: {e}")
+            logger.error(f"Could not send password reset email to {user.email}: {e}")
+            send_error = str(e)
 
-        response_data = {
-            'message': 'Password reset instructions have been sent to your email.',
-            'email': user.email,
-        }
+        if not email_sent and settings.DEBUG:
+            return Response(
+                {
+                    'error': f'Failed to send email via SMTP ({send_error}). Please ensure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD (Gmail App Password) are set in backend/.env.',
+                    'detail': send_error,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-        if settings.DEBUG or getattr(settings, 'ENVIRONMENT', 'development') != 'production':
-            response_data['reset_url'] = reset_url
-            response_data['dev_uid'] = uid
-            response_data['dev_token'] = token
-            response_data['email_sent'] = email_sent
-
-        return Response(response_data, status=status.HTTP_200_OK)
+        return Response(
+            {
+                'message': f'Password reset instructions have been sent to {user.email}.',
+                'email': user.email,
+            },
+            status=status.HTTP_200_OK
+        )
 
 
 class PasswordResetConfirmView(APIView):
