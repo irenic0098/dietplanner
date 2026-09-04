@@ -7,6 +7,8 @@ import BottomBar from './components/BottomBar';
 import Home from './features/home/Home';
 import Login from './features/auth/Login';
 import Register from './features/auth/Register';
+import ForgotPassword from './features/auth/ForgotPassword';
+import ResetPassword from './features/auth/ResetPassword';
 import UserDashboard from './features/dashboard/UserDashboard';
 import DailyTracking from './features/tracking/DailyTracking';
 import WeightTrend from './features/tracking/WeightTrend';
@@ -136,6 +138,30 @@ export default function App() {
             element={
               <PublicAuthRoute>
                 <Register />
+              </PublicAuthRoute>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <PublicAuthRoute>
+                <ForgotPassword />
+              </PublicAuthRoute>
+            }
+          />
+          <Route
+            path="/reset-password/:uid/:token"
+            element={
+              <PublicAuthRoute>
+                <ResetPassword />
+              </PublicAuthRoute>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <PublicAuthRoute>
+                <ResetPassword />
               </PublicAuthRoute>
             }
           />

@@ -139,6 +139,40 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  requestPasswordReset: async (identity) => {
+    set({ loading: true, error: null, fieldErrors: {} });
+    try {
+      const res = await client.post('auth/password-reset/', {
+        identity: identity.trim(),
+        email: identity.trim(),
+      });
+      set({ loading: false });
+      return { success: true, data: res.data };
+    } catch (err) {
+      const { message, fields } = formatApiError(err, 'Failed to process password reset request.');
+      set({ error: message, fieldErrors: fields, loading: false });
+      return { success: false, message, fields };
+    }
+  },
+
+  confirmPasswordReset: async ({ uid, token, newPassword, newPasswordConfirm }) => {
+    set({ loading: true, error: null, fieldErrors: {} });
+    try {
+      const res = await client.post('auth/password-reset-confirm/', {
+        uid,
+        token,
+        new_password: newPassword,
+        new_password_confirm: newPasswordConfirm,
+      });
+      set({ loading: false });
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      const { message, fields } = formatApiError(err, 'Failed to reset password.');
+      set({ error: message, fieldErrors: fields, loading: false });
+      return { success: false, message, fields };
+    }
+  },
+
   checkAuth: async () => {
     await get().initializeAuth();
   },

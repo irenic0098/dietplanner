@@ -3,6 +3,8 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80
 export const API_ENDPOINTS = {
   AUTH_LOGIN: `${API_BASE_URL}/api/auth/login/`,
   AUTH_REGISTER: `${API_BASE_URL}/api/auth/register/`,
+  AUTH_PASSWORD_RESET: `${API_BASE_URL}/api/auth/password-reset/`,
+  AUTH_PASSWORD_RESET_CONFIRM: `${API_BASE_URL}/api/auth/password-reset-confirm/`,
   AUTH_REFRESH: `${API_BASE_URL}/api/auth/token/refresh/`,
   AUTH_ME: `${API_BASE_URL}/api/auth/me/`,
   USER_PROFILE: `${API_BASE_URL}/api/auth/profile/`,

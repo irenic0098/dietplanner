@@ -247,6 +247,18 @@ REST_FRAMEWORK = {
     ),
 }
 
+# Email Configuration
+EMAIL_BACKEND = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.smtp.EmailBackend' if ENVIRONMENT == 'production' and os.getenv('EMAIL_HOST') else 'django.core.mail.backends.console.EmailBackend'
+)
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'DietPlanner <noreply@dietplanner.local>')
+
 # SimpleJWT configuration
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
@@ -261,10 +273,15 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
+# Frontend URL Configuration
+FRONTEND_URL = os.getenv(
+    'FRONTEND_URL',
+    'https://dietplanner.vercel.app' if ENVIRONMENT == 'production' else 'http://localhost:5173'
+).rstrip('/')
+
 # CORS Configuration
 if ENVIRONMENT == 'production':
-    _frontend_url = os.getenv('FRONTEND_URL', 'https://dietplanner.vercel.app').rstrip('/')
-    CORS_ALLOWED_ORIGINS = [_frontend_url]
+    CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
     CORS_ALLOW_CREDENTIALS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = True

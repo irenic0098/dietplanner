@@ -1,4 +1,8 @@
+from django.db import models
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_decode
+from django.utils.encoding import force_str
 from rest_framework import serializers
 from .models import CustomUser, UserProfile
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -77,3 +81,48 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['email'] = self.user.email
         data['id'] = self.user.id
         return data
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.CharField(required=False, allow_blank=True)
+    identity = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        query = attrs.get('email') or attrs.get('identity') or ''
+        query = query.strip()
+        if not query:
+            raise serializers.ValidationError({'email': 'Please provide your registered email or username.'})
+
+        user = CustomUser.objects.filter(
+            models.Q(email__iexact=query) | models.Q(username__iexact=query)
+        ).first()
+        if not user:
+            raise serializers.ValidationError({'email': 'No account found with that email or username.'})
+
+        attrs['user'] = user
+        return attrs
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    new_password_confirm = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['new_password_confirm']:
+            raise serializers.ValidationError({'new_password_confirm': 'Passwords do not match.'})
+
+        try:
+            user_id = force_str(urlsafe_base64_decode(attrs['uid']))
+            user = CustomUser.objects.get(pk=user_id)
+        except (TypeError, ValueError, OverflowError, CustomUser.DoesNotExist):
+            raise serializers.ValidationError({'token': 'Invalid or expired reset link.'})
+
+        if not default_token_generator.check_token(user, attrs['token']):
+            raise serializers.ValidationError({'token': 'Reset link is invalid or has expired.'})
+
+        validate_password(attrs['new_password'], user=user)
+        attrs['user'] = user
+        return attrs
+

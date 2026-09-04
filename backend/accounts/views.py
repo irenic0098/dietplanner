@@ -1,3 +1,10 @@
+import logging
+from urllib.parse import urlparse
+from django.conf import settings
+from django.core.mail import send_mail
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.contrib.auth.tokens import default_token_generator
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -7,8 +14,89 @@ from .serializers import (
     RegisterSerializer,
     CustomUserSerializer,
     UserProfileSerializer,
-    MyTokenObtainPairSerializer
+    MyTokenObtainPairSerializer,
+    PasswordResetRequestSerializer,
+    PasswordResetConfirmSerializer,
 )
+
+logger = logging.getLogger(__name__)
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+        # Determine frontend URL
+        origin = request.headers.get('Origin') or request.headers.get('Referer')
+        if origin:
+            parsed = urlparse(origin)
+            base_frontend = f"{parsed.scheme}://{parsed.netloc}"
+        else:
+            base_frontend = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+
+        reset_url = f"{base_frontend}/reset-password/{uid}/{token}"
+
+        subject = "Reset your DietPlanner password"
+        message = (
+            f"Hello {user.username},\n\n"
+            f"You recently requested to reset the password for your DietPlanner account.\n\n"
+            f"Please click the link below to set a new password:\n"
+            f"{reset_url}\n\n"
+            f"If you did not request a password reset, please ignore this email.\n\n"
+            f"— The DietPlanner Team"
+        )
+
+        email_sent = False
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@dietplanner.local'),
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            email_sent = True
+        except Exception as e:
+            logger.warning(f"Could not send password reset email to {user.email}: {e}")
+
+        response_data = {
+            'message': 'Password reset instructions have been sent to your email.',
+            'email': user.email,
+        }
+
+        if settings.DEBUG or getattr(settings, 'ENVIRONMENT', 'development') != 'production':
+            response_data['reset_url'] = reset_url
+            response_data['dev_uid'] = uid
+            response_data['dev_token'] = token
+            response_data['email_sent'] = email_sent
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        new_password = serializer.validated_data['new_password']
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response(
+            {'message': 'Your password has been reset successfully. You can now sign in with your new password.'},
+            status=status.HTTP_200_OK,
+        )
+
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
