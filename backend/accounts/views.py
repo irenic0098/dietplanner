@@ -87,36 +87,66 @@ class PasswordResetRequestView(APIView):
 
         email_sent = False
         send_error = None
+
+        logger.info(f"Password reset link generated for {user.email}: {reset_url}")
+
         try:
             send_mail(
                 subject=subject,
                 message=message,
                 html_message=html_message,
-                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None) or 'DietPlanner <noreply@dietplanner.local>',
                 recipient_list=[user.email],
                 fail_silently=False,
             )
             email_sent = True
         except Exception as e:
-            logger.error(f"Could not send password reset email to {user.email}: {e}")
+            logger.error(f"Could not send password reset email to {user.email} via primary backend: {e}")
             send_error = str(e)
 
-        if not email_sent and settings.DEBUG:
+            # If in DEBUG mode and primary email sending fails (e.g. SMTP unconfigured), fall back to console backend
+            if settings.DEBUG:
+                try:
+                    from django.core.mail import get_connection
+                    console_conn = get_connection('django.core.mail.backends.console.EmailBackend')
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        html_message=html_message,
+                        from_email='DietPlanner <noreply@dietplanner.local>',
+                        recipient_list=[user.email],
+                        connection=console_conn,
+                        fail_silently=True,
+                    )
+                    email_sent = True
+                    logger.info(f"[DEV FALLBACK] Password reset email printed to console for {user.email}. Reset URL: {reset_url}")
+                except Exception as fb_err:
+                    logger.error(f"Console email fallback failed: {fb_err}")
+
+        if not email_sent:
+            if settings.DEBUG:
+                return Response(
+                    {
+                        'error': f'Failed to send email ({send_error}). Please ensure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD are set in backend/.env or configure email backend.',
+                        'detail': send_error,
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
             return Response(
                 {
-                    'error': f'Failed to send email via SMTP ({send_error}). Please ensure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD (Gmail App Password) are set in backend/.env.',
-                    'detail': send_error,
+                    'error': 'Unable to send password reset email at this time. Please try again later or contact support.',
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        return Response(
-            {
-                'message': f'Password reset instructions have been sent to {user.email}.',
-                'email': user.email,
-            },
-            status=status.HTTP_200_OK
-        )
+        resp_data = {
+            'message': f'Password reset instructions have been sent to {user.email}.',
+            'email': user.email,
+        }
+        if settings.DEBUG:
+            resp_data['reset_url'] = reset_url
+
+        return Response(resp_data, status=status.HTTP_200_OK)
 
 
 class PasswordResetConfirmView(APIView):

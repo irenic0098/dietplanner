@@ -5,6 +5,7 @@ const formatApiError = (err, fallback) => {
   const data = err.response?.data;
   if (!data) return { message: fallback, fields: {} };
   if (typeof data === 'string') return { message: data, fields: {} };
+  if (data.error) return { message: data.error, fields: {} };
   if (data.detail) return { message: data.detail, fields: {} };
 
   const fields = {};

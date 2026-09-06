@@ -248,20 +248,25 @@ REST_FRAMEWORK = {
 }
 
 # Email Configuration
-# If EMAIL_BACKEND is set in .env, respect it.
-# Otherwise, if EMAIL_HOST_USER is provided, use SMTP backend so emails are sent via Gmail/SMTP.
-# Falls back to console backend only if no credentials are configured.
-_default_email_backend = (
-    'django.core.mail.backends.smtp.EmailBackend'
-    if os.getenv('EMAIL_HOST_USER') or ENVIRONMENT == 'production'
-    else 'django.core.mail.backends.console.EmailBackend'
-)
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', _default_email_backend)
+# If EMAIL_BACKEND is set to SMTP but EMAIL_HOST_USER is empty in development,
+# fall back to console backend so password resets print to server logs without throwing 500 error.
+_email_backend_env = os.getenv('EMAIL_BACKEND', '').strip()
+_email_user_env = os.getenv('EMAIL_HOST_USER', '').strip()
+
+if _email_backend_env == 'django.core.mail.backends.smtp.EmailBackend' and not _email_user_env and DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+elif _email_backend_env:
+    EMAIL_BACKEND = _email_backend_env
+elif _email_user_env:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 'yes')
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_USER = _email_user_env
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv(
     'DEFAULT_FROM_EMAIL',
